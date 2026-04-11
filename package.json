@@ -1,0 +1,33 @@
+{
+  "name": "raincheck-weather-app",
+  "version": "1.0.0",
+  "description": "A comprehensive, modern weather application built with HTML, CSS, and JavaScript using the OpenWeatherMap API",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "serve": "npx http-server -p 8000 -o",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "weather",
+    "api",
+    "openweathermap",
+    "javascript",
+    "html",
+    "css",
+    "responsive",
+    "pwa"
+  ],
+  "author": "RainCheck Weather App",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/raincheck-weather-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/raincheck-weather-app/issues"
+  },
+  "homepage": "https://github.com/yourusername/raincheck-weather-app#readme",
+  "devDependencies": {},
+  "dependencies": {}
+}

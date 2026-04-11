@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>RainCheck — Weather</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0984e3">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <meta name="description" content="Beautiful weather app with glassmorphism design, multiple themes, and real-time forecasts.">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="brand">
+                <i class="fas fa-bolt brand-icon"></i>
+                <h1 class="brand-name">RainCheck</h1>
+            </div>
+            <div class="header-actions">
+                <span id="currentTime" class="clock"></span>
+                <button id="themeBtn" class="icon-btn" title="Change theme">
+                    <i class="fas fa-palette"></i>
+                </button>
+                <button id="creditsBtn" class="icon-btn" title="About">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search -->
+        <div class="search-section">
+            <div class="search-bar">
+                <i class="fas fa-search search-bar-icon"></i>
+                <input type="text" id="cityInput" placeholder="Search for a city..." autocomplete="off">
+                <button id="searchBtn" class="search-action" aria-label="Search">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <div class="search-divider"></div>
+                <button id="locationBtn" class="search-action loc-action" title="Use my location" aria-label="Use my location">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+            </div>
+            <div id="suggestions" class="suggestions hidden"></div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loadingSpinner" class="loader hidden">
+            <div class="loader-ring"><div></div><div></div><div></div></div>
+            <p>Fetching weather data...</p>
+        </div>
+
+        <!-- Error -->
+        <div id="errorMessage" class="error-banner hidden">
+            <i class="fas fa-cloud-showers-heavy"></i>
+            <p id="errorText">Something went wrong.</p>
+            <button class="retry-btn" onclick="location.reload()">
+                <i class="fas fa-redo"></i> Retry
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <main id="weatherContent" class="weather-content hidden">
+            <!-- Current Weather Hero -->
+            <section class="current-weather-card">
+                <div class="current-weather-header">
+                    <div class="location-info">
+                        <h2 id="currentCity">--</h2>
+                        <p id="currentDate" class="date-text">--</p>
+                    </div>
+                    <div class="unit-toggle">
+                        <button id="celsiusBtn" class="temp-btn active">°C</button>
+                        <span class="unit-divider">/</span>
+                        <button id="fahrenheitBtn" class="temp-btn">°F</button>
+                    </div>
+                </div>
+
+                <div class="weather-hero">
+                    <div class="weather-icon-main">
+                        <img id="currentWeatherIcon" src="" alt="Weather">
+                    </div>
+                    <div class="temperature">
+                        <span id="currentTemp" class="temp-value">--</span>
+                    </div>
+                </div>
+
+                <div class="weather-description">
+                    <h3 id="weatherMain">--</h3>
+                    <p id="weatherDescription">--</p>
+                </div>
+
+                <div class="quick-stats">
+                    <div class="quick-stat">
+                        <i class="fas fa-tint"></i>
+                        <div>
+                            <span class="qs-label">Humidity</span>
+                            <span id="humidity" class="qs-value">--</span>
+                        </div>
+                    </div>
+                    <div class="quick-stat">
+                        <i class="fas fa-wind"></i>
+                        <div>
+                            <span class="qs-label">Wind</span>
+                            <span id="windSpeed" class="qs-value">--</span>
+                        </div>
+                    </div>
+                    <div class="quick-stat">
+                        <i class="fas fa-thermometer-half"></i>
+                        <div>
+                            <span class="qs-label">Feels Like</span>
+                            <span id="feelsLike" class="qs-value">--</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Weather Details -->
+            <section class="weather-details">
+                <div class="detail-item">
+                    <i class="fas fa-eye"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Visibility</span>
+                        <span id="visibility" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Pressure</span>
+                        <span id="pressure" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-thermometer-empty"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Min Temp</span>
+                        <span id="tempMin" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-thermometer-full"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Max Temp</span>
+                        <span id="tempMax" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-water"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Sea Level</span>
+                        <span id="seaLevel" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-mountain"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Ground Level</span>
+                        <span id="groundLevel" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-location-arrow"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Wind Dir</span>
+                        <span id="windDirection" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-wind"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">Wind Gust</span>
+                        <span id="windGust" class="detail-value">--</span>
+                    </div>
+                </div>
+                <div class="detail-item">
+                    <i class="fas fa-sun"></i>
+                    <div class="detail-info">
+                        <span class="detail-label">UV Index</span>
+                        <span id="uvIndex" class="detail-value">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sun Times -->
+            <section class="sun-times">
+                <div class="sun-time">
+                    <i class="fas fa-sun sunrise-icon"></i>
+                    <div class="sun-info">
+                        <span class="sun-label">Sunrise</span>
+                        <span id="sunrise" class="sun-value">--</span>
+                    </div>
+                </div>
+                <div class="sun-arc"></div>
+                <div class="sun-time">
+                    <i class="fas fa-moon sunset-icon"></i>
+                    <div class="sun-info">
+                        <span class="sun-label">Sunset</span>
+                        <span id="sunset" class="sun-value">--</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Hourly Forecast -->
+            <section class="card-section">
+                <h3 class="card-title"><i class="fas fa-clock"></i> Hourly Forecast</h3>
+                <div id="hourlyForecast" class="hourly-forecast"></div>
+            </section>
+
+            <!-- 5-Day Forecast -->
+            <section class="card-section">
+                <h3 class="card-title"><i class="fas fa-calendar-alt"></i> 5-Day Forecast</h3>
+                <div id="forecastContainer" class="forecast-container"></div>
+            </section>
+
+            <!-- Weather Map -->
+            <section class="card-section">
+                <h3 class="card-title"><i class="fas fa-map"></i> Weather Map</h3>
+                <div class="map-controls">
+                    <button class="map-btn active" data-layer="temp">Temp</button>
+                    <button class="map-btn" data-layer="precipitation">Rain</button>
+                    <button class="map-btn" data-layer="wind">Wind</button>
+                    <button class="map-btn" data-layer="clouds">Clouds</button>
+                </div>
+                <div id="weatherMap" class="weather-map">
+                    <div id="mapFrame" class="map-frame"></div>
+                </div>
+            </section>
+
+            <!-- Last Updated -->
+            <div class="last-updated">
+                <i class="fas fa-sync-alt"></i>
+                <span id="lastUpdated">Updated just now</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- Theme Modal -->
+    <div id="themeModal" class="modal hidden">
+        <div class="modal-backdrop" data-close="themeModal"></div>
+        <div class="modal-panel">
+            <div class="modal-head">
+                <h2><i class="fas fa-palette"></i> Theme</h2>
+                <button class="close-btn" id="closeThemeBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="theme-options">
+                    <label class="theme-option">
+                        <input type="radio" id="autoTheme" name="theme" value="auto" checked>
+                        <div class="theme-card">
+                            <div class="theme-swatch auto-swatch"></div>
+                            <span>Auto</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="lightTheme" name="theme" value="light">
+                        <div class="theme-card">
+                            <div class="theme-swatch light-swatch"></div>
+                            <span>Light</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="darkTheme" name="theme" value="dark">
+                        <div class="theme-card">
+                            <div class="theme-swatch dark-swatch"></div>
+                            <span>Dark</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="sunriseTheme" name="theme" value="sunrise">
+                        <div class="theme-card">
+                            <div class="theme-swatch sunrise-swatch"></div>
+                            <span>Sunrise</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="sunsetTheme" name="theme" value="sunset">
+                        <div class="theme-card">
+                            <div class="theme-swatch sunset-swatch"></div>
+                            <span>Sunset</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="nightTheme" name="theme" value="night">
+                        <div class="theme-card">
+                            <div class="theme-swatch night-swatch"></div>
+                            <span>Night</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="oceanTheme" name="theme" value="ocean">
+                        <div class="theme-card">
+                            <div class="theme-swatch ocean-swatch"></div>
+                            <span>Ocean</span>
+                        </div>
+                    </label>
+                    <label class="theme-option">
+                        <input type="radio" id="forestTheme" name="theme" value="forest">
+                        <div class="theme-card">
+                            <div class="theme-swatch forest-swatch"></div>
+                            <span>Forest</span>
+                        </div>
+                    </label>
+                </div>
+                <p class="theme-note"><i class="fas fa-info-circle"></i> Auto adjusts based on time &amp; weather</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credits Modal -->
+    <div id="creditsModal" class="modal hidden">
+        <div class="modal-backdrop" data-close="creditsModal"></div>
+        <div class="modal-panel credits-panel">
+            <div class="modal-head credits-head">
+                <h2><i class="fas fa-heart"></i> About RainCheck</h2>
+                <button class="close-btn" id="closeCreditsBtn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body credits-body">
+                <div class="creator-section">
+                    <div class="creator-avatar">
+                        <i class="fas fa-user-astronaut"></i>
+                    </div>
+                    <h3 class="creator-name">w0wzers</h3>
+                    <p class="creator-sub">Emre</p>
+                    <p class="creator-role">Developer &amp; Designer</p>
+                </div>
+                <div class="credits-grid">
+                    <div class="credit-item"><i class="fab fa-html5"></i><span>HTML5</span></div>
+                    <div class="credit-item"><i class="fab fa-css3-alt"></i><span>CSS3</span></div>
+                    <div class="credit-item"><i class="fab fa-js-square"></i><span>JavaScript</span></div>
+                    <div class="credit-item"><i class="fas fa-cloud"></i><span>Open-Meteo</span></div>
+                    <div class="credit-item"><i class="fab fa-font-awesome"></i><span>Font Awesome</span></div>
+                    <div class="credit-item"><i class="fab fa-google"></i><span>Google Fonts</span></div>
+                </div>
+                <div class="credits-footer-section">
+                    <p>&copy; 2024 RainCheck &mdash; Made with <i class="fas fa-heart" style="color:var(--accent)"></i> by <strong>w0wzers (Emre)</strong></p>
+                    <span class="version-tag">v3.0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=3.0"></script>
+</body>
+</html>
