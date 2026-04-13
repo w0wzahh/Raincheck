@@ -4,7 +4,8 @@
   "description": "A comprehensive, modern weather application built with HTML, CSS, and JavaScript using the OpenWeatherMap API",
   "main": "index.html",
   "scripts": {
-    "start": "python -m http.server 8000",
+    "build": "node build.js",
+    "start": "npx http-server dist -p 8000 -o",
     "serve": "npx http-server -p 8000 -o",
     "test": "echo \"No tests specified\" && exit 0"
   },
@@ -29,6 +30,9 @@
   },
   "homepage": "https://github.com/yourusername/raincheck-weather-app#readme",
   "devDependencies": {
+    "clean-css": "^5.3.3",
+    "html-minifier-terser": "^7.2.0",
+    "javascript-obfuscator": "^5.4.1",
     "sharp": "^0.34.5"
   }
 }

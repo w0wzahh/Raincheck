@@ -5,48 +5,87 @@
 // ── Security & Anti-Tampering ──
 (function() {
     // Console warning — large styled message
-    const warnStyle = 'color:#e74c3c;font-size:20px;font-weight:900;text-shadow:1px 1px 2px rgba(0,0,0,.3)';
-    const msgStyle = 'color:#2d3436;font-size:14px;font-weight:500';
-    const smallStyle = 'color:#636e72;font-size:12px';
-    console.log('%c⚠ STOP!', warnStyle);
-    console.log('%cThis is a restricted area of the RainCheck application.', msgStyle);
-    console.log('%cIf someone told you to copy-paste something here, it is a scam and will give them access to your data.', msgStyle);
-    console.log('%cNo user should be tampering with the RainCheck website. Unauthorized inspection, modification, or reverse-engineering of this application is strictly prohibited.', msgStyle);
-    console.log('%cFor security inquiries, contact the developer.', smallStyle);
+    var _w = 'color:#e74c3c;font-size:22px;font-weight:900;text-shadow:1px 1px 2px rgba(0,0,0,.3)';
+    var _m = 'color:#2d3436;font-size:14px;font-weight:600';
+    var _s = 'color:#636e72;font-size:12px';
+    console.log('%c⛔ STOP!', _w);
+    console.log('%cThis is a restricted area of the RainCheck application.', _m);
+    console.log('%cIf someone told you to copy-paste something here, it is a scam and will give them access to your data.', _m);
+    console.log('%cNo user should be tampering with the RainCheck website.', _m);
+    console.log('%cUnauthorized inspection, modification, or reverse-engineering of this application is strictly prohibited and may be logged.', _m);
+    console.log('%cFor security inquiries, contact the developer.', _s);
 
-    // Disable right-click context menu
+    var _blocked = false;
+    var _blockPage = function() {
+        if (_blocked) return;
+        _blocked = true;
+        try {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#0984e3,#0652DD);color:#fff;font-family:Inter,sans-serif;text-align:center;padding:2rem"><div><div style="font-size:4rem;margin-bottom:1rem">⛔</div><h1 style="font-size:2rem;margin-bottom:1rem">Access Denied</h1><p style="font-size:1.1rem;opacity:.9;max-width:450px;line-height:1.6">Developer tools have been detected.<br>Please close developer tools and <strong>refresh the page</strong> to continue using RainCheck.</p><button onclick="location.reload()" style="margin-top:1.5rem;padding:12px 32px;background:rgba(255,255,255,.2);color:#fff;border:2px solid rgba(255,255,255,.4);border-radius:12px;font-size:1rem;cursor:pointer;backdrop-filter:blur(10px)">Refresh Page</button></div></div>';
+        } catch(e) {}
+    };
+
+    // 1. Disable right-click context menu
     document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
-    // Block common dev tools shortcuts
+    // 2. Block dev tools keyboard shortcuts
     document.addEventListener('keydown', function(e) {
-        // F12
         if (e.key === 'F12') { e.preventDefault(); return false; }
-        // Ctrl+Shift+I (DevTools), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspector)
-        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
-            e.preventDefault(); return false;
-        }
-        // Ctrl+U (View Source)
-        if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) { e.preventDefault(); return false; }
+        if (e.ctrlKey && e.shiftKey && /^[IJCijc]$/.test(e.key)) { e.preventDefault(); return false; }
+        if (e.ctrlKey && /^[Uu]$/.test(e.key)) { e.preventDefault(); return false; }
+        // Cmd+Option+I on Mac
+        if (e.metaKey && e.altKey && /^[Ii]$/.test(e.key)) { e.preventDefault(); return false; }
     });
 
-    // Detect DevTools open via debugger timing
-    var _dtCheck = setInterval(function() {
-        var start = performance.now();
-        debugger;
-        if (performance.now() - start > 100) {
-            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0984e3;color:#fff;font-family:Inter,sans-serif;text-align:center;padding:2rem"><div><h1 style="font-size:2rem;margin-bottom:1rem">⚠ Access Denied</h1><p style="font-size:1.1rem;opacity:.9;max-width:400px">Developer tools detected. Please close them and refresh the page to continue using RainCheck.</p></div></div>';
-            clearInterval(_dtCheck);
+    // 3. DevTools detection — window size differential (works when opened via menu too)
+    var _threshold = 160;
+    var _sizeCheck = function() {
+        var widthDiff = window.outerWidth - window.innerWidth;
+        var heightDiff = window.outerHeight - window.innerHeight;
+        if (widthDiff > _threshold || heightDiff > _threshold) {
+            _blockPage();
         }
-    }, 1000);
+    };
+    setInterval(_sizeCheck, 800);
+    window.addEventListener('resize', _sizeCheck);
 
-    // Disable text selection on the page (except inputs/textareas)
+    // 4. DevTools detection — element inspection trap
+    var _devtoolsElem = new Image();
+    Object.defineProperty(_devtoolsElem, 'id', {
+        get: function() { _blockPage(); }
+    });
+    setInterval(function() {
+        console.log('%c', _devtoolsElem);
+    }, 2000);
+
+    // 5. DevTools detection — debugger timing
+    setInterval(function() {
+        var t0 = performance.now();
+        debugger;
+        if (performance.now() - t0 > 100) { _blockPage(); }
+    }, 3000);
+
+    // 6. Disable text selection (except inputs/textareas)
     document.addEventListener('selectstart', function(e) {
+        var tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+        e.preventDefault();
+    });
+
+    // 7. Disable drag
+    document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+
+    // 8. Disable copy
+    document.addEventListener('copy', function(e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         e.preventDefault();
     });
 
-    // Disable drag
-    document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+    // 9. Clear console periodically to make inspection harder
+    setInterval(function() {
+        console.clear();
+        console.log('%c⛔ STOP!', _w);
+        console.log('%cNo user should be tampering with the RainCheck website.', _m);
+    }, 5000);
 })();
 
 // Open-Meteo API Configuration
