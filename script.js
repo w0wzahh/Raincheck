@@ -826,13 +826,77 @@ function shareWeather() {
     }
     const d = currentWeatherData.current;
     const unit = currentUnit === 'metric' ? '°C' : '°F';
-    const text = `🌤 Weather in ${d.name}: ${Math.round(d.main.temp)}${unit}, ${d.weather[0].description}. Feels like ${Math.round(d.main.feels_like)}${unit}. Humidity ${d.main.humidity}%. — via RainCheck`;
+    const text = `🌤 Weather in ${d.name}: ${Math.round(d.main.temp)}${unit}, ${d.weather[0].description}. Feels like ${Math.round(d.main.feels_like)}${unit}. Humidity ${d.main.humidity}%.\n\nhttps://w0wzahhsraincheck.netlify.app`;
 
+    // Try Web Share API first (works on most mobile browsers & some WebViews)
     if (navigator.share) {
-        navigator.share({ title: 'RainCheck Weather', text }).catch(() => {});
-    } else {
-        navigator.clipboard.writeText(text).then(() => showToast('Weather copied to clipboard!')).catch(() => showToast('Could not share'));
+        navigator.share({
+            title: `Weather in ${d.name}`,
+            text: text,
+            url: 'https://w0wzahhsraincheck.netlify.app'
+        }).catch(() => {
+            // Share was cancelled or failed — fall back to clipboard
+            copyToClipboard(text);
+        });
+        return;
     }
+
+    // Fallback: copy to clipboard
+    copyToClipboard(text);
+}
+
+function copyToClipboard(text) {
+    // Modern clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => showToast('Weather copied to clipboard — paste it anywhere to share!'))
+            .catch(() => fallbackCopy(text));
+        return;
+    }
+    fallbackCopy(text);
+}
+
+function fallbackCopy(text) {
+    // Legacy fallback for WebViews/older browsers that don't support clipboard API
+    try {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (success) {
+            showToast('Weather copied to clipboard — paste it anywhere to share!');
+        } else {
+            showShareModal(text);
+        }
+    } catch (e) {
+        showShareModal(text);
+    }
+}
+
+function showShareModal(text) {
+    // Last resort: show a modal with the text for manual copying
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'shareModal';
+    modal.innerHTML = `
+        <div class="modal-backdrop" onclick="this.closest('.modal').remove();document.body.style.overflow=''"></div>
+        <div class="modal-panel">
+            <div class="modal-head">
+                <h2><i class="fas fa-share-nodes"></i> Share Weather</h2>
+                <button class="close-btn" onclick="this.closest('.modal').remove();document.body.style.overflow=''"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px">Long-press the text below to copy it:</p>
+                <div class="share-text-box" style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:16px;font-size:0.9rem;color:var(--text);line-height:1.5;user-select:all;-webkit-user-select:all">${text.replace(/\n/g, '<br>')}</div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    document.body.style.overflow = 'hidden';
 }
 
 // ── Suggestions ──
@@ -1263,13 +1327,90 @@ function updateAutoTheme() {
     document.body.classList.add(timeClass);
 }
 
-// ── Service Worker Registration ──
+// ── Service Worker + Auto-Update System ──
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered, scope:', reg.scope))
-            .catch(err => console.log('SW registration failed:', err));
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW registered, scope:', reg.scope);
+
+            // Check for updates every 60 seconds
+            setInterval(() => { reg.update(); }, 60000);
+
+            // When a new SW is found waiting
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (!newWorker) return;
+
+                newWorker.addEventListener('statechange', () => {
+                    // New SW is installed and ready — if there's already a controller, that means this is an UPDATE
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        showUpdateBanner();
+                    }
+                });
+            });
+        }).catch(err => console.log('SW registration failed:', err));
+
+        // Listen for SW_UPDATED message from the service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data?.type === 'SW_UPDATED') {
+                showUpdateBanner();
+            }
+        });
+
+        // When the controlling SW changes (new one took over), reload for fresh content
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
+        });
     });
+}
+
+function showUpdateBanner() {
+    // Don't show multiple banners
+    if (document.querySelector('.update-banner')) return;
+
+    const banner = document.createElement('div');
+    banner.className = 'update-banner';
+    banner.innerHTML = `
+        <div class="update-banner-content">
+            <i class="fas fa-arrow-up-from-bracket"></i>
+            <span>A new version of RainCheck is available!</span>
+            <button class="update-btn" onclick="applyUpdate()">Update Now</button>
+            <button class="update-dismiss" onclick="this.closest('.update-banner').remove()"><i class="fas fa-times"></i></button>
+        </div>
+    `;
+    document.body.appendChild(banner);
+
+    // Auto-apply update after 8 seconds if user doesn't dismiss
+    setTimeout(() => {
+        if (document.querySelector('.update-banner')) {
+            applyUpdate();
+        }
+    }, 8000);
+}
+
+function applyUpdate() {
+    const banner = document.querySelector('.update-banner');
+    if (banner) {
+        banner.querySelector('.update-banner-content span').textContent = 'Updating...';
+        banner.querySelector('.update-btn').disabled = true;
+    }
+    // Tell the waiting SW to activate immediately
+    if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.ready.then(reg => {
+            if (reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            } else {
+                // No waiting SW — just reload
+                window.location.reload();
+            }
+        });
+    } else {
+        window.location.reload();
+    }
 }
 
 // ── Touch Swipe (refresh) ──

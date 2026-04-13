@@ -1172,6 +1172,64 @@ input { font-family: inherit; border: none; outline: none; background: none; col
     color: var(--text);
 }
 
+/* ── Update Banner ── */
+.update-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 20000;
+    animation: slideDown 0.4s var(--spring);
+}
+.update-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #0984e3, #0652DD);
+    color: #fff;
+    font-size: 0.85rem;
+    font-family: var(--font);
+    font-weight: 500;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.update-banner-content i:first-child {
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.update-banner-content span { flex: 1; }
+.update-btn {
+    padding: 6px 16px;
+    background: #fff;
+    color: #0984e3;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    font-family: var(--font);
+    cursor: pointer;
+    border: none;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.update-btn:hover { transform: scale(1.05); }
+.update-btn:disabled { opacity: 0.6; }
+.update-dismiss {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    font-size: 0.75rem;
+    cursor: pointer;
+    border: none;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+.update-dismiss:hover { background: rgba(255,255,255,0.3); }
+
 /* ── Animations ── */
 @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(16px); }
