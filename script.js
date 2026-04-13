@@ -2,6 +2,53 @@
 // RAINCHECK — Weather App
 // ============================================
 
+// ── Security & Anti-Tampering ──
+(function() {
+    // Console warning — large styled message
+    const warnStyle = 'color:#e74c3c;font-size:20px;font-weight:900;text-shadow:1px 1px 2px rgba(0,0,0,.3)';
+    const msgStyle = 'color:#2d3436;font-size:14px;font-weight:500';
+    const smallStyle = 'color:#636e72;font-size:12px';
+    console.log('%c⚠ STOP!', warnStyle);
+    console.log('%cThis is a restricted area of the RainCheck application.', msgStyle);
+    console.log('%cIf someone told you to copy-paste something here, it is a scam and will give them access to your data.', msgStyle);
+    console.log('%cNo user should be tampering with the RainCheck website. Unauthorized inspection, modification, or reverse-engineering of this application is strictly prohibited.', msgStyle);
+    console.log('%cFor security inquiries, contact the developer.', smallStyle);
+
+    // Disable right-click context menu
+    document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // Block common dev tools shortcuts
+    document.addEventListener('keydown', function(e) {
+        // F12
+        if (e.key === 'F12') { e.preventDefault(); return false; }
+        // Ctrl+Shift+I (DevTools), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspector)
+        if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
+            e.preventDefault(); return false;
+        }
+        // Ctrl+U (View Source)
+        if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) { e.preventDefault(); return false; }
+    });
+
+    // Detect DevTools open via debugger timing
+    var _dtCheck = setInterval(function() {
+        var start = performance.now();
+        debugger;
+        if (performance.now() - start > 100) {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0984e3;color:#fff;font-family:Inter,sans-serif;text-align:center;padding:2rem"><div><h1 style="font-size:2rem;margin-bottom:1rem">⚠ Access Denied</h1><p style="font-size:1.1rem;opacity:.9;max-width:400px">Developer tools detected. Please close them and refresh the page to continue using RainCheck.</p></div></div>';
+            clearInterval(_dtCheck);
+        }
+    }, 1000);
+
+    // Disable text selection on the page (except inputs/textareas)
+    document.addEventListener('selectstart', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        e.preventDefault();
+    });
+
+    // Disable drag
+    document.addEventListener('dragstart', function(e) { e.preventDefault(); });
+})();
+
 // Open-Meteo API Configuration
 const BASE_URL = 'https://api.open-meteo.com/v1';
 const GEO_URL = 'https://geocoding-api.open-meteo.com/v1';

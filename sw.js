@@ -1,10 +1,10 @@
 // Service Worker for RainCheck Weather App — Auto-Update Edition
-const CACHE_NAME = 'raincheck-v7';
+const CACHE_NAME = 'raincheck-v8';
 const APP_SHELL = [
     './',
     './index.html',
-    './styles.css?v=5.1',
-    './script.js?v=5.1',
+    './styles.css?v=5.2',
+    './script.js?v=5.2',
     './manifest.json'
 ];
 const CDN_ASSETS = [
