@@ -1,5 +1,5 @@
 // Service Worker for RainCheck Weather App — Auto-Update Edition
-const CACHE_NAME = 'raincheck-v5';
+const CACHE_NAME = 'raincheck-v6';
 const APP_SHELL = [
     './',
     './index.html',

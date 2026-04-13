@@ -28,6 +28,7 @@
     "url": "https://github.com/yourusername/raincheck-weather-app/issues"
   },
   "homepage": "https://github.com/yourusername/raincheck-weather-app#readme",
-  "devDependencies": {},
-  "dependencies": {}
+  "devDependencies": {
+    "sharp": "^0.34.5"
+  }
 }

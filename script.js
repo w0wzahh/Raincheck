@@ -175,7 +175,11 @@ function setupEventListeners() {
     cityInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSearch(); });
     cityInput.addEventListener('input', handleCityInput);
     cityInput.addEventListener('focus', () => {
-        if (cityInput.value.length > 2) getCitySuggestions(cityInput.value);
+        if (cityInput.value.length > 2) {
+            getCitySuggestions(cityInput.value);
+        } else if (cityInput.value.length === 0) {
+            showRecentSearches();
+        }
     });
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.search-section')) hideSuggestions();
@@ -259,6 +263,8 @@ function handleCityInput() {
     clearTimeout(searchDebounceTimer);
     if (query.length > 2) {
         searchDebounceTimer = setTimeout(() => getCitySuggestions(query), 300);
+    } else if (query.length === 0) {
+        showRecentSearches();
     } else {
         hideSuggestions();
     }
@@ -1423,6 +1429,60 @@ document.addEventListener('touchend', (e) => {
         getWeatherByCoords(currentLat, currentLon);
     }
 }, { passive: true });
+
+// ── Scroll to Top ──
+const scrollTopBtn = document.getElementById('scrollTopBtn');
+if (scrollTopBtn) {
+    window.addEventListener('scroll', () => {
+        scrollTopBtn.classList.toggle('hidden', window.scrollY < 400);
+    }, { passive: true });
+    scrollTopBtn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+}
+
+// ── Offline/Online Indicator ──
+const offlineBanner = document.getElementById('offlineBanner');
+function updateOnlineStatus() {
+    if (offlineBanner) {
+        offlineBanner.classList.toggle('hidden', navigator.onLine);
+    }
+}
+window.addEventListener('online', () => {
+    updateOnlineStatus();
+    showToast('Back online!');
+    if (currentLat && currentLon) getWeatherByCoords(currentLat, currentLon);
+});
+window.addEventListener('offline', () => {
+    updateOnlineStatus();
+    showToast('You\'re offline — using cached data');
+});
+updateOnlineStatus();
+
+// ── Recent Searches Dropdown ──
+function showRecentSearches() {
+    try {
+        const recent = JSON.parse(localStorage.getItem('raincheck_recent') || '[]');
+        if (recent.length === 0) { hideSuggestions(); return; }
+        suggestions.innerHTML = '';
+        const header = document.createElement('div');
+        header.className = 'suggestion-header';
+        header.innerHTML = '<i class="fas fa-clock"></i> Recent Searches';
+        suggestions.appendChild(header);
+        recent.forEach(entry => {
+            const el = document.createElement('div');
+            el.className = 'suggestion-item recent-item';
+            el.innerHTML = `<i class="fas fa-clock-rotate-left"></i> ${entry}`;
+            el.addEventListener('click', () => {
+                cityInput.value = entry;
+                getWeatherByCity(entry.split(',')[0].trim());
+                hideSuggestions();
+            });
+            suggestions.appendChild(el);
+        });
+        suggestions.classList.remove('hidden');
+    } catch (e) { /* ignore */ }
+}
 
 // ── Export for testing ──
 if (typeof module !== 'undefined' && module.exports) {
