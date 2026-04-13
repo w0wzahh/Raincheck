@@ -1,0 +1,297 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Generate signing keystore
+        run: |
+          keytool -genkeypair \
+            -alias raincheck \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -keystore ${{ github.workspace }}/raincheck.keystore \
+            -storepass raincheck123 \
+            -keypass raincheck123 \
+            -dname "CN=RainCheck, OU=Dev, O=RainCheck, L=Unknown, ST=Unknown, C=US"
+
+      - name: Create TWA Android project
+        run: |
+          mkdir -p twa-app/app/src/main/res/values
+          mkdir -p twa-app/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p twa-app/gradle/wrapper
+
+          # Download icon
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-512.png" \
+            -o twa-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+          # root build.gradle
+          cat > twa-app/build.gradle << 'GRADLE'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.2.2'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          GRADLE
+
+          # settings.gradle
+          cat > twa-app/settings.gradle << 'SETTINGS'
+          include ':app'
+          rootProject.name = "RainCheckTWA"
+          SETTINGS
+
+          # gradle.properties
+          cat > twa-app/gradle.properties << 'PROPS'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m
+          PROPS
+
+          # Gradle wrapper properties
+          cat > twa-app/gradle/wrapper/gradle-wrapper.properties << 'WRAPPER'
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          WRAPPER
+
+          # app/build.gradle
+          cat > twa-app/app/build.gradle << 'APP_GRADLE'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'app.netlify.w0wzahhsraincheck.twa'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "app.netlify.w0wzahhsraincheck.twa"
+                  minSdk 19
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0.0"
+
+                  manifestPlaceholders = [
+                      hostName: "w0wzahhsraincheck.netlify.app",
+                      defaultUrl: "https://w0wzahhsraincheck.netlify.app/",
+                      launcherName: "RainCheck",
+                      assetStatements: '[{"relation": ["delegate_permission/common.handle_all_urls"],' +
+                          '"target": {"namespace": "web", "site": "https://w0wzahhsraincheck.netlify.app"}}]'
+                  ]
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file("${rootProject.projectDir}/../raincheck.keystore")
+                      storePassword "raincheck123"
+                      keyAlias "raincheck"
+                      keyPassword "raincheck123"
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled true
+                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+
+          dependencies {
+              implementation 'androidx.browser:browser:1.8.0'
+              implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+          }
+          APP_GRADLE
+
+          # AndroidManifest.xml
+          cat > twa-app/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="${launcherName}"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.Translucent.NoTitleBar">
+
+                  <meta-data
+                      android:name="asset_statements"
+                      android:value='${assetStatements}' />
+
+                  <activity
+                      android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
+                      android:exported="true">
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.DEFAULT_URL"
+                          android:value="${defaultUrl}" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
+                          android:value="#0984e3" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
+                          android:value="#0984e3" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
+                          android:resource="@mipmap/ic_launcher" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
+                          android:value="#0984e3" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
+                          android:value="300" />
+
+                      <meta-data
+                          android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
+                          android:value="${applicationId}.fileprovider" />
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                      <intent-filter android:autoVerify="true">
+                          <action android:name="android.intent.action.VIEW" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                          <category android:name="android.intent.category.BROWSABLE" />
+                          <data android:scheme="https"
+                              android:host="${hostName}" />
+                      </intent-filter>
+                  </activity>
+
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:grantUriPermissions="true"
+                      android:exported="false">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/filepaths" />
+                  </provider>
+
+                  <service
+                      android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+                      android:enabled="true"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                          <category android:name="android.intent.category.DEFAULT" />
+                      </intent-filter>
+                  </service>
+              </application>
+          </manifest>
+          MANIFEST
+
+          # strings.xml
+          cat > twa-app/app/src/main/res/values/strings.xml << 'STRINGS'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">RainCheck</string>
+          </resources>
+          STRINGS
+
+          # FileProvider paths
+          mkdir -p twa-app/app/src/main/res/xml
+          cat > twa-app/app/src/main/res/xml/filepaths.xml << 'FILEPATHS'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths>
+              <files-path name="images" path="images/" />
+          </paths>
+          FILEPATHS
+
+      - name: Setup Gradle wrapper
+        working-directory: twa-app
+        run: |
+          gradle wrapper --gradle-version 8.5 || true
+          # If gradle isn't available, download wrapper manually
+          if [ ! -f gradlew ]; then
+            curl -sL "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o gradle.zip
+            unzip -q gradle.zip
+            gradle-8.5/bin/gradle wrapper --gradle-version 8.5
+            rm -rf gradle-8.5 gradle.zip
+          fi
+          chmod +x gradlew
+
+      - name: Build APK
+        working-directory: twa-app
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          echo "=== Build outputs ==="
+          find . -name "*.apk" -type f
+          cp app/build/outputs/apk/release/app-release.apk ../raincheck.apk || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: raincheck-apk
+          path: raincheck.apk
+
+      - name: Upload keystore (save this!)
+        uses: actions/upload-artifact@v4
+        with:
+          name: raincheck-keystore
+          path: raincheck.keystore
+
+      - name: Generate assetlinks.json
+        run: |
+          FINGERPRINT=$(keytool -list -v -keystore raincheck.keystore -alias raincheck -storepass raincheck123 | grep "SHA256:" | sed 's/.*SHA256: //')
+          echo "SHA-256 Fingerprint: $FINGERPRINT"
+          cat > assetlinks.json << EOF
+          [{
+            "relation": ["delegate_permission/common.handle_all_urls"],
+            "target": {
+              "namespace": "android_app",
+              "package_name": "app.netlify.w0wzahhsraincheck.twa",
+              "sha256_cert_fingerprints": ["$FINGERPRINT"]
+            }
+          }]
+          EOF
+          cat assetlinks.json
+
+      - name: Upload assetlinks.json
+        uses: actions/upload-artifact@v4
+        with:
+          name: assetlinks-json
+          path: assetlinks.json
