@@ -152,15 +152,10 @@ jobs:
           package app.netlify.raincheck;
 
           import android.annotation.SuppressLint;
-          import android.app.Activity;
-          import android.content.pm.ActivityInfo;
           import android.graphics.Color;
-          import android.net.ConnectivityManager;
-          import android.net.NetworkInfo;
           import android.os.Build;
           import android.os.Bundle;
           import android.view.View;
-          import android.view.Window;
           import android.view.WindowManager;
           import android.webkit.GeolocationPermissions;
           import android.webkit.WebChromeClient;
@@ -168,11 +163,12 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
-          import android.widget.FrameLayout;
+          import android.widget.TextView;
           import android.Manifest;
           import android.content.pm.PackageManager;
+          import androidx.appcompat.app.AppCompatActivity;
 
-          public class MainActivity extends Activity {
+          public class MainActivity extends AppCompatActivity {
 
               private static final String APP_URL = "https://w0wzahhsraincheck.netlify.app/";
               private static final int LOCATION_PERMISSION_CODE = 1001;
@@ -183,24 +179,26 @@ jobs:
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
 
-                  // Fullscreen immersive
-                  requestWindowFeature(Window.FEATURE_NO_TITLE);
-                  getWindow().setFlags(
-                      WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                      WindowManager.LayoutParams.FLAG_FULLSCREEN
-                  );
-
-                  // Status bar color
+                  // Status bar + nav bar color
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                      getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                       getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
                       getWindow().setStatusBarColor(Color.parseColor("#0984e3"));
                       getWindow().setNavigationBarColor(Color.parseColor("#0984e3"));
                   }
 
-                  // Create WebView programmatically
-                  webView = new WebView(this);
-                  setContentView(webView);
+                  try {
+                      // Create WebView programmatically
+                      webView = new WebView(this);
+                      setContentView(webView);
+                  } catch (Exception e) {
+                      // WebView not available on this device
+                      TextView tv = new TextView(this);
+                      tv.setText("WebView is not available. Please update Android System WebView.");
+                      tv.setPadding(48, 48, 48, 48);
+                      tv.setTextSize(18);
+                      setContentView(tv);
+                      return;
+                  }
 
                   // Configure WebView
                   WebSettings settings = webView.getSettings();
@@ -225,15 +223,7 @@ jobs:
                   webView.setWebViewClient(new WebViewClient() {
                       @Override
                       public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                          String url = request.getUrl().toString();
-                          if (url.contains("w0wzahhsraincheck.netlify.app") ||
-                              url.contains("open-meteo.com") ||
-                              url.contains("openstreetmap.org") ||
-                              url.contains("googleapis.com") ||
-                              url.contains("cdnjs.cloudflare.com")) {
-                              return false; // Load inside app
-                          }
-                          return false; // Keep everything in app
+                          return false;
                       }
                   });
 
@@ -278,15 +268,27 @@ jobs:
                   if (webView != null) webView.onPause();
                   super.onPause();
               }
+
+              @Override
+              protected void onDestroy() {
+                  if (webView != null) {
+                      webView.destroy();
+                      webView = null;
+                  }
+                  super.onDestroy();
+              }
           }
           JAVA
 
-          # Splash screen theme
+          # App theme - uses AppCompat for maximum compatibility
           cat > twa-app/app/src/main/res/values/styles.xml << 'STYLES'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="SplashTheme" parent="android:Theme.Light.NoTitleBar">
+              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
                   <item name="android:windowBackground">@drawable/splash_bg</item>
+                  <item name="colorPrimary">#0984e3</item>
+                  <item name="colorPrimaryDark">#0974c9</item>
+                  <item name="colorAccent">#74b9ff</item>
               </style>
           </resources>
           STYLES
@@ -294,33 +296,25 @@ jobs:
           cat > twa-app/app/src/main/res/values-night/styles.xml << 'STYLESN'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="SplashTheme" parent="android:Theme.Light.NoTitleBar">
+              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
                   <item name="android:windowBackground">@drawable/splash_bg</item>
+                  <item name="colorPrimary">#0984e3</item>
+                  <item name="colorPrimaryDark">#0974c9</item>
+                  <item name="colorAccent">#74b9ff</item>
               </style>
           </resources>
           STYLESN
 
-          # Splash background drawable
+          # Splash background - simple gradient only (no bitmap ref that could fail)
           cat > twa-app/app/src/main/res/drawable/splash_bg.xml << 'SPLASH'
           <?xml version="1.0" encoding="utf-8"?>
-          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-              <item>
-                  <shape android:shape="rectangle">
-                      <gradient
-                          android:startColor="#74b9ff"
-                          android:endColor="#0984e3"
-                          android:angle="135" />
-                  </shape>
-              </item>
-              <item
-                  android:gravity="center"
-                  android:width="128dp"
-                  android:height="128dp">
-                  <bitmap
-                      android:src="@mipmap/ic_launcher"
-                      android:gravity="center" />
-              </item>
-          </layer-list>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android"
+              android:shape="rectangle">
+              <gradient
+                  android:startColor="#74b9ff"
+                  android:endColor="#0984e3"
+                  android:angle="135" />
+          </shape>
           SPLASH
 
           # AndroidManifest.xml - simple WebView, no Google deps
@@ -338,7 +332,7 @@ jobs:
                   android:icon="@mipmap/ic_launcher"
                   android:label="RainCheck"
                   android:supportsRtl="true"
-                  android:theme="@style/SplashTheme"
+                  android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="false"
                   android:hardwareAccelerated="true">
 
