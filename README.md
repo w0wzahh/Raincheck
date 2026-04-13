@@ -72,7 +72,7 @@ The app uses the OpenWeatherMap API with the following endpoints:
 - UV Index Data
 - Weather Maps
 
-API Key is already configured: `bd5e378503939ddaee76f12ad7a97608`
+No API key required — the app uses Open-Meteo's free, open-source weather API.
 
 ## File Structure
 

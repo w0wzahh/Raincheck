@@ -1,7 +1,6 @@
 // ============================================
-// RAINCHECK v3.0 — Complete UI/UX Rehaul
+// RAINCHECK — Weather App
 // ============================================
-console.log('RainCheck v4.0 loaded — Enhanced Weather Experience');
 
 // Open-Meteo API Configuration
 const BASE_URL = 'https://api.open-meteo.com/v1';
@@ -126,9 +125,20 @@ document.addEventListener('DOMContentLoaded', function () {
     // Try geolocation or fall back to last city / default
     const lastCity = localStorage.getItem('raincheck_lastCity');
     if (window.isSecureContext && navigator.geolocation) {
-        const geoSuccess = (pos) => {
+        const geoSuccess = async (pos) => {
             currentLat = pos.coords.latitude;
             currentLon = pos.coords.longitude;
+            // Reverse geocode
+            try {
+                const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentLat}&lon=${currentLon}&format=json&zoom=10&addressdetails=1`, {
+                    headers: { 'Accept-Language': 'en' }
+                });
+                const geo = await resp.json();
+                if (geo?.address) {
+                    currentCityName = geo.address.city || geo.address.town || geo.address.village || geo.address.municipality || geo.address.county || null;
+                    currentCountry = geo.address.country || null;
+                }
+            } catch (e) { /* fallback to timezone name */ }
             getWeatherByCoords(currentLat, currentLon);
         };
         const geoFallback = () => getWeatherByCity(lastCity || 'New York');
@@ -281,10 +291,22 @@ function getCurrentLocation() {
     }
     showLoading();
 
-    // Try high accuracy first, fall back to low accuracy
-    const onSuccess = (pos) => {
+    const onSuccess = async (pos) => {
         currentLat = pos.coords.latitude;
         currentLon = pos.coords.longitude;
+        // Reverse geocode to get actual city name
+        try {
+            const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentLat}&lon=${currentLon}&format=json&zoom=10&addressdetails=1`, {
+                headers: { 'Accept-Language': 'en' }
+            });
+            const geo = await resp.json();
+            if (geo?.address) {
+                currentCityName = geo.address.city || geo.address.town || geo.address.village || geo.address.municipality || geo.address.county || null;
+                currentCountry = geo.address.country || null;
+            }
+        } catch (e) {
+            // Reverse geocoding failed — will fall back to timezone name
+        }
         getWeatherByCoords(currentLat, currentLon);
     };
 
@@ -324,11 +346,13 @@ async function getWeatherByCity(cityName) {
             return;
         }
 
-        if (geoData.results.length === 1) {
-            const { latitude: lat, longitude: lon, name, country } = geoData.results[0];
-            currentCityName = name;
-            currentCountry = country;
-            await getWeatherByCoords(lat, lon);
+        // Auto-select if single result or exact name match
+        const exactMatch = geoData.results.find(r => r.name.toLowerCase() === cityName.toLowerCase());
+        if (geoData.results.length === 1 || exactMatch) {
+            const result = exactMatch || geoData.results[0];
+            currentCityName = result.name;
+            currentCountry = result.country;
+            await getWeatherByCoords(result.latitude, result.longitude);
         } else {
             hideLoading();
             displaySuggestions(geoData.results);
@@ -382,11 +406,11 @@ function transformCurrentWeather(data, lat, lon) {
         },
         weather: [{ main: weather.main, description: weather.description, icon: iconCode + iconSuffix }],
         wind: {
-            speed: currentUnit === 'metric' ? current.wind_speed_10m / 3.6 : current.wind_speed_10m / 2.237,
+            speed: current.wind_speed_10m,
             deg: current.wind_direction_10m,
-            gust: currentUnit === 'metric' ? current.wind_gusts_10m / 3.6 : current.wind_gusts_10m / 2.237
+            gust: current.wind_gusts_10m
         },
-        visibility: 10000,
+        visibility: current.cloud_cover !== undefined ? Math.max(1, Math.round((100 - current.cloud_cover) / 10)) * 1000 : 10000,
         clouds: { all: current.cloud_cover },
         dt: Math.floor(new Date(current.time).getTime() / 1000),
         timezone: data.utc_offset_seconds
@@ -419,7 +443,7 @@ function transformForecastData(data) {
             dt: Math.floor(new Date(hourly.time[i]).getTime() / 1000),
             main: { temp: hourly.temperature_2m[i], temp_min: hourly.temperature_2m[i], temp_max: hourly.temperature_2m[i], humidity: hourly.relative_humidity_2m ? hourly.relative_humidity_2m[i] : data.current.relative_humidity_2m },
             weather: [{ main: weather.main, description: weather.description, icon: iconCode + iconSuffix }],
-            wind: { speed: currentUnit === 'metric' ? (hourly.wind_speed_10m ? hourly.wind_speed_10m[i] / 3.6 : data.current.wind_speed_10m / 3.6) : (hourly.wind_speed_10m ? hourly.wind_speed_10m[i] / 2.237 : data.current.wind_speed_10m / 2.237) },
+            wind: { speed: hourly.wind_speed_10m ? hourly.wind_speed_10m[i] : data.current.wind_speed_10m },
             pop: (hourly.precipitation_probability[i] || 0) / 100
         });
     }
@@ -438,7 +462,7 @@ function transformDailyForecast(data) {
             temp: { max: daily.temperature_2m_max[i], min: daily.temperature_2m_min[i] },
             weather: [{ main: weather.main, description: weather.description, icon: iconCode + 'd' }],
             humidity: 0,
-            wind: { speed: currentUnit === 'metric' ? daily.wind_speed_10m_max[i] / 3.6 : daily.wind_speed_10m_max[i] / 2.237 }
+            wind: { speed: daily.wind_speed_10m_max[i] }
         });
     }
     return dailyList;
@@ -592,13 +616,15 @@ function updateCurrentWeather(data, uvData) {
     weatherMain.textContent = data.weather[0].main;
     weatherDescription.textContent = data.weather[0].description;
 
-    visibility.textContent = `${(data.visibility / 1000).toFixed(1)} km`;
+    const visUnit = currentUnit === 'metric' ? 'km' : 'mi';
+    const visVal = currentUnit === 'metric' 
+        ? (data.visibility / 1000).toFixed(1) 
+        : (data.visibility / 1609.34).toFixed(1);
+    visibility.textContent = `${visVal} ${visUnit}`;
     humidity.textContent = `${data.main.humidity}%`;
 
-    const windVal = currentUnit === 'metric'
-        ? `${(data.wind.speed * 3.6).toFixed(1)} km/h`
-        : `${data.wind.speed.toFixed(1)} mph`;
-    windSpeed.textContent = windVal;
+    const windUnit = currentUnit === 'metric' ? 'km/h' : 'mph';
+    windSpeed.textContent = `${data.wind.speed.toFixed(1)} ${windUnit}`;
     feelsLike.textContent = `${Math.round(data.main.feels_like)}${unit}`;
     tempMin.textContent = `${Math.round(data.main.temp_min)}${unit}`;
     tempMax.textContent = `${Math.round(data.main.temp_max)}${unit}`;
@@ -613,10 +639,8 @@ function updateCurrentWeather(data, uvData) {
     }
 
     if (data.wind.gust) {
-        const gustVal = currentUnit === 'metric'
-            ? `${(data.wind.gust * 3.6).toFixed(1)} km/h`
-            : `${data.wind.gust.toFixed(1)} mph`;
-        windGust.textContent = gustVal;
+        const gustUnit = currentUnit === 'metric' ? 'km/h' : 'mph';
+        windGust.textContent = `${data.wind.gust.toFixed(1)} ${gustUnit}`;
     } else {
         windGust.textContent = 'No gusts';
     }
@@ -653,9 +677,8 @@ function updateDailyForecast(forecastData) {
         const date = new Date(day.dt * 1000);
         const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
         const dayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        const windVal = currentUnit === 'metric'
-            ? `${(day.wind.speed * 3.6).toFixed(0)} km/h`
-            : `${day.wind.speed.toFixed(0)} mph`;
+        const windUnit = currentUnit === 'metric' ? 'km/h' : 'mph';
+        const windVal = `${day.wind.speed.toFixed(0)} ${windUnit}`;
 
         el.innerHTML = `
             <div class="forecast-day">
@@ -780,9 +803,9 @@ function updateWindCompass(data) {
     const speed = data.wind.speed || 0;
     const gust = data.wind.gust || 0;
     const unit = currentUnit === 'metric' ? 'km/h' : 'mph';
-    const speedVal = currentUnit === 'metric' ? (speed * 3.6).toFixed(1) : speed.toFixed(1);
-    const gustVal = currentUnit === 'metric' ? (gust * 3.6).toFixed(1) : gust.toFixed(1);
-    const beaufort = getBeaufortScale(currentUnit === 'metric' ? speed * 3.6 : speed * 1.609);
+    const speedVal = speed.toFixed(1);
+    const gustVal = gust.toFixed(1);
+    const beaufort = getBeaufortScale(currentUnit === 'metric' ? speed : speed * 1.609);
 
     container.innerHTML = `
         <div class="compass-wrap">
@@ -884,7 +907,6 @@ function fallbackCopy(text) {
 }
 
 function showShareModal(text) {
-    // Last resort: show a modal with the text for manual copying
     const modal = document.createElement('div');
     modal.className = 'modal';
     modal.id = 'shareModal';
@@ -897,7 +919,7 @@ function showShareModal(text) {
             </div>
             <div class="modal-body">
                 <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px">Long-press the text below to copy it:</p>
-                <div class="share-text-box" style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:16px;font-size:0.9rem;color:var(--text);line-height:1.5;user-select:all;-webkit-user-select:all">${text.replace(/\n/g, '<br>')}</div>
+                <div class="share-text-box" style="background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:16px;font-size:0.9rem;color:var(--text);line-height:1.5;user-select:all;-webkit-user-select:all;white-space:pre-wrap">${escapeHtml(text)}</div>
             </div>
         </div>
     `;
@@ -1154,7 +1176,7 @@ async function createWeatherMap(layer) {
         // Location badge
         const badge = document.createElement('div');
         badge.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:#fff;padding:8px 12px;border-radius:10px;font-size:11px;backdrop-filter:blur(12px);z-index:20;font-family:var(--font);border:1px solid rgba(255,255,255,0.1);';
-        badge.innerHTML = `<div style="font-weight:700;margin-bottom:2px">${currentCityName || 'Location'}</div><div style="opacity:0.6;font-size:10px">${currentLat.toFixed(2)}\u00b0, ${currentLon.toFixed(2)}\u00b0</div>`;
+        badge.innerHTML = `<div style="font-weight:700;margin-bottom:2px">${escapeHtml(currentCityName || 'Location')}</div><div style="opacity:0.6;font-size:10px">${currentLat.toFixed(2)}\u00b0, ${currentLon.toFixed(2)}\u00b0</div>`;
         mapArea.appendChild(badge);
 
         // Bottom data strip
@@ -1228,6 +1250,12 @@ function showError(message) {
 }
 
 // ── Toast Notification ──
+function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
 function showToast(message, duration = 4000) {
     const existing = document.querySelector('.toast');
     if (existing) existing.remove();
@@ -1235,7 +1263,13 @@ function showToast(message, duration = 4000) {
     const toast = document.createElement('div');
     toast.className = 'toast';
     toast.style.cssText = `position:fixed;top:20px;right:20px;background:rgba(30,30,40,0.95);color:#fff;padding:14px 22px;border-radius:12px;font-size:0.85rem;font-family:var(--font);z-index:20000;backdrop-filter:blur(20px);border:1px solid var(--glass-border);box-shadow:0 8px 32px rgba(0,0,0,0.4);animation:slideDown 0.3s var(--ease);max-width:320px;`;
-    toast.innerHTML = `<i class="fas fa-info-circle" style="color:var(--accent);margin-right:8px"></i>${message}`;
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-info-circle';
+    icon.style.cssText = 'color:var(--accent);margin-right:8px';
+    const span = document.createElement('span');
+    span.textContent = message;
+    toast.appendChild(icon);
+    toast.appendChild(span);
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(-8px)'; toast.style.transition = 'all 0.3s'; setTimeout(() => toast.remove(), 300); }, duration);
 }
@@ -1337,7 +1371,7 @@ function updateAutoTheme() {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').then(reg => {
-            console.log('SW registered, scope:', reg.scope);
+
 
             // Check for updates every 60 seconds
             setInterval(() => { reg.update(); }, 60000);
@@ -1354,7 +1388,7 @@ if ('serviceWorker' in navigator) {
                     }
                 });
             });
-        }).catch(err => console.log('SW registration failed:', err));
+        }).catch(() => {});
 
         // Listen for SW_UPDATED message from the service worker
         navigator.serviceWorker.addEventListener('message', (event) => {
@@ -1472,7 +1506,11 @@ function showRecentSearches() {
         recent.forEach(entry => {
             const el = document.createElement('div');
             el.className = 'suggestion-item recent-item';
-            el.innerHTML = `<i class="fas fa-clock-rotate-left"></i> ${entry}`;
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-clock-rotate-left';
+            const text = document.createTextNode(' ' + entry);
+            el.appendChild(icon);
+            el.appendChild(text);
             el.addEventListener('click', () => {
                 cityInput.value = entry;
                 getWeatherByCity(entry.split(',')[0].trim());

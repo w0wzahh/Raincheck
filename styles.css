@@ -812,14 +812,21 @@ input { font-family: inherit; border: none; outline: none; background: none; col
 .theme-note i { color: var(--accent); }
 
 /* ── Credits Modal ── */
-.credits-panel { max-width: 440px; overflow: hidden; border-radius: var(--radius-md); }
+.credits-panel { 
+    max-width: 440px; 
+    overflow: hidden; 
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+}
 
 /* Credits Hero */
 .credits-hero {
     position: relative;
-    padding: 36px 24px 24px;
+    padding: 40px 24px 24px;
     text-align: center;
     overflow: hidden;
+    flex-shrink: 0;
 }
 .credits-hero-bg {
     position: absolute;
@@ -846,11 +853,12 @@ input { font-family: inherit; border: none; outline: none; background: none; col
 .credits-app-icon {
     position: relative;
     z-index: 1;
+    display: block;
     width: 72px;
     height: 72px;
     border-radius: 18px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-    margin-bottom: 12px;
+    margin: 0 auto 12px;
     animation: iconFloat 3s ease-in-out infinite;
 }
 .credits-app-name {
@@ -877,7 +885,13 @@ input { font-family: inherit; border: none; outline: none; background: none; col
 }
 
 /* Credits Body */
-.credits-body { padding: 20px 20px 24px; text-align: center; }
+.credits-body { 
+    padding: 20px 20px 24px; 
+    text-align: center; 
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
 
 /* Creator Card */
 .creator-card {
@@ -933,6 +947,7 @@ input { font-family: inherit; border: none; outline: none; background: none; col
     margin-bottom: 10px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
 }
 .credits-section-title i { font-size: 0.7rem; color: var(--accent); }

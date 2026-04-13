@@ -9,52 +9,41 @@
       <stop offset="0%" style="stop-color:#ffffff"/>
       <stop offset="100%" style="stop-color:#dfe6e9"/>
     </linearGradient>
-    <linearGradient id="check" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#00b894"/>
-      <stop offset="100%" style="stop-color:#00cec9"/>
-    </linearGradient>
     <linearGradient id="drop" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" style="stop-color:#74b9ff"/>
       <stop offset="100%" style="stop-color:#0984e3"/>
     </linearGradient>
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.15"/>
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/>
     </filter>
     <clipPath id="roundRect">
       <rect width="512" height="512" rx="112" ry="112"/>
     </clipPath>
   </defs>
   
-  <!-- Background -->
   <g clip-path="url(#roundRect)">
     <rect width="512" height="512" fill="url(#bg)"/>
-    <!-- Subtle radial glow -->
-    <circle cx="200" cy="180" r="200" fill="rgba(255,255,255,0.08)"/>
+    <circle cx="180" cy="160" r="200" fill="rgba(255,255,255,0.06)"/>
   </g>
   
   <g clip-path="url(#roundRect)">
     <!-- Cloud -->
     <g filter="url(#shadow)">
-      <path d="M380 280H160c-38.6 0-70-31.4-70-70s31.4-70 70-70c2.4 0 4.8.1 7.1.4C179 108.8 211.8 86 250 86c49.7 0 90 40.3 90 90 0 2-.1 4-.2 5.9C364.2 190.4 382 215 382 244c0 19.9-16.1 36-36 36h-2z" 
+      <path d="M400 240H130c-44.2 0-80-35.8-80-80s35.8-80 80-80c3.5 0 7 .2 10.4.7C153.6 46.4 193 20 238 20c55.2 0 100 44.8 100 100 0 3.2-.2 6.3-.4 9.4C366 139 390 169 390 204c0 19.9-16.1 36-36 36h46z"
             fill="url(#cloud)" opacity="0.95"/>
-      <!-- Cloud highlight -->
-      <path d="M380 280H160c-38.6 0-70-31.4-70-70 0-6.4.9-12.5 2.5-18.4C96.2 220 126.2 240 160 240h220c11 0 20.8-5 27.4-12.8C404.5 236.8 396 258 380 280z"
-            fill="rgba(255,255,255,0.3)"/>
     </g>
-    
-    <!-- Checkmark circle -->
-    <circle cx="320" cy="250" r="52" fill="url(#check)" filter="url(#shadow)"/>
-    <circle cx="320" cy="250" r="52" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="2"/>
-    <!-- Checkmark -->
-    <polyline points="296,250 312,266 344,234" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
     
     <!-- Rain drops -->
     <g opacity="0.9">
-      <path d="M155 330c0 11-9 20-9 20s-9-9-9-20a9 9 0 0118 0z" fill="url(#drop)"/>
-      <path d="M205 355c0 11-9 20-9 20s-9-9-9-20a9 9 0 0118 0z" fill="url(#drop)"/>
-      <path d="M255 340c0 11-9 20-9 20s-9-9-9-20a9 9 0 0118 0z" fill="url(#drop)"/>
-      <path d="M180 385c0 11-9 20-9 20s-9-9-9-20a9 9 0 0118 0z" fill="url(#drop)" opacity="0.6"/>
-      <path d="M230 400c0 11-9 20-9 20s-9-9-9-20a9 9 0 0118 0z" fill="url(#drop)" opacity="0.4"/>
+      <path d="M155 300c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)"/>
+      <path d="M225 300c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)"/>
+      <path d="M295 300c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)"/>
+      <path d="M365 300c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)"/>
+      <path d="M190 370c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)" opacity="0.65"/>
+      <path d="M260 370c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)" opacity="0.65"/>
+      <path d="M330 370c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)" opacity="0.65"/>
+      <path d="M225 440c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)" opacity="0.4"/>
+      <path d="M295 440c0 16-14 30-14 30s-14-14-14-30a14 14 0 0128 0z" fill="url(#drop)" opacity="0.4"/>
     </g>
   </g>
 </svg>
