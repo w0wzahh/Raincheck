@@ -1,5 +1,5 @@
 // Service Worker for RainCheck Weather App
-const CACHE_NAME = 'raincheck-v3';
+const CACHE_NAME = 'raincheck-v4';
 const urlsToCache = [
     './',
     './index.html',
