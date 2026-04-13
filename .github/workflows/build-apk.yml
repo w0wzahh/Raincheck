@@ -38,8 +38,6 @@ jobs:
         run: |
           mkdir -p twa-app/app/src/main/java/app/netlify/raincheck
           mkdir -p twa-app/app/src/main/res/values
-          mkdir -p twa-app/app/src/main/res/layout
-          mkdir -p twa-app/app/src/main/res/drawable
           mkdir -p twa-app/app/src/main/res/mipmap-mdpi
           mkdir -p twa-app/app/src/main/res/mipmap-hdpi
           mkdir -p twa-app/app/src/main/res/mipmap-xhdpi
@@ -141,21 +139,21 @@ jobs:
           }
 
           dependencies {
-              implementation 'androidx.appcompat:appcompat:1.6.1'
-              implementation 'androidx.webkit:webkit:1.9.0'
-              implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
           }
           APP_GRADLE
 
           # Main Activity - WebView based, works on ALL Android devices
+          # ZERO external dependencies - only android.* framework classes
           cat > twa-app/app/src/main/java/app/netlify/raincheck/MainActivity.java << 'JAVA'
           package app.netlify.raincheck;
 
           import android.annotation.SuppressLint;
+          import android.app.Activity;
           import android.graphics.Color;
           import android.os.Build;
           import android.os.Bundle;
           import android.view.View;
+          import android.view.Window;
           import android.view.WindowManager;
           import android.webkit.GeolocationPermissions;
           import android.webkit.WebChromeClient;
@@ -163,12 +161,12 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
           import android.widget.TextView;
           import android.Manifest;
           import android.content.pm.PackageManager;
-          import androidx.appcompat.app.AppCompatActivity;
 
-          public class MainActivity extends AppCompatActivity {
+          public class MainActivity extends Activity {
 
               private static final String APP_URL = "https://w0wzahhsraincheck.netlify.app/";
               private static final int LOCATION_PERMISSION_CODE = 1001;
@@ -280,15 +278,15 @@ jobs:
           }
           JAVA
 
-          # App theme - uses AppCompat for maximum compatibility
+          # App theme - ONLY built-in Android framework themes, no libraries
           cat > twa-app/app/src/main/res/values/styles.xml << 'STYLES'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="android:windowBackground">@drawable/splash_bg</item>
-                  <item name="colorPrimary">#0984e3</item>
-                  <item name="colorPrimaryDark">#0974c9</item>
-                  <item name="colorAccent">#74b9ff</item>
+              <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+                  <item name="android:windowBackground">#0984e3</item>
+                  <item name="android:colorPrimary">#0984e3</item>
+                  <item name="android:statusBarColor">#0984e3</item>
+                  <item name="android:navigationBarColor">#0984e3</item>
               </style>
           </resources>
           STYLES
@@ -296,26 +294,14 @@ jobs:
           cat > twa-app/app/src/main/res/values-night/styles.xml << 'STYLESN'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
-                  <item name="android:windowBackground">@drawable/splash_bg</item>
-                  <item name="colorPrimary">#0984e3</item>
-                  <item name="colorPrimaryDark">#0974c9</item>
-                  <item name="colorAccent">#74b9ff</item>
+              <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+                  <item name="android:windowBackground">#0984e3</item>
+                  <item name="android:colorPrimary">#0984e3</item>
+                  <item name="android:statusBarColor">#0984e3</item>
+                  <item name="android:navigationBarColor">#0984e3</item>
               </style>
           </resources>
           STYLESN
-
-          # Splash background - simple gradient only (no bitmap ref that could fail)
-          cat > twa-app/app/src/main/res/drawable/splash_bg.xml << 'SPLASH'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android"
-              android:shape="rectangle">
-              <gradient
-                  android:startColor="#74b9ff"
-                  android:endColor="#0984e3"
-                  android:angle="135" />
-          </shape>
-          SPLASH
 
           # AndroidManifest.xml - simple WebView, no Google deps
           cat > twa-app/app/src/main/AndroidManifest.xml << 'MANIFEST'
