@@ -34,13 +34,29 @@ jobs:
             -keypass raincheck123 \
             -dname "CN=RainCheck, OU=Dev, O=RainCheck, L=Unknown, ST=Unknown, C=US"
 
-      - name: Create TWA Android project
+      - name: Create WebView Android project
         run: |
+          mkdir -p twa-app/app/src/main/java/app/netlify/raincheck
           mkdir -p twa-app/app/src/main/res/values
+          mkdir -p twa-app/app/src/main/res/layout
+          mkdir -p twa-app/app/src/main/res/drawable
+          mkdir -p twa-app/app/src/main/res/mipmap-mdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-hdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-xhdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-xxhdpi
           mkdir -p twa-app/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p twa-app/app/src/main/res/values-night
           mkdir -p twa-app/gradle/wrapper
 
-          # Download icon
+          # Download icons at all density sizes
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-72.png" \
+            -o twa-app/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-96.png" \
+            -o twa-app/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-144.png" \
+            -o twa-app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-192.png" \
+            -o twa-app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
           curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-512.png" \
             -o twa-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
@@ -66,7 +82,7 @@ jobs:
           # settings.gradle
           cat > twa-app/settings.gradle << 'SETTINGS'
           include ':app'
-          rootProject.name = "RainCheckTWA"
+          rootProject.name = "RainCheck"
           SETTINGS
 
           # gradle.properties
@@ -84,30 +100,22 @@ jobs:
           zipStorePath=wrapper/dists
           WRAPPER
 
-          # app/build.gradle
+          # app/build.gradle - WebView based, no Google dependencies
           cat > twa-app/app/build.gradle << 'APP_GRADLE'
           plugins {
               id 'com.android.application'
           }
 
           android {
-              namespace 'app.netlify.w0wzahhsraincheck.twa'
-              compileSdk 34
+              namespace 'app.netlify.raincheck'
+              compileSdk 33
 
               defaultConfig {
-                  applicationId "app.netlify.w0wzahhsraincheck.twa"
-                  minSdk 19
-                  targetSdk 34
+                  applicationId "app.netlify.raincheck"
+                  minSdk 21
+                  targetSdk 33
                   versionCode 1
                   versionName "1.0.0"
-
-                  manifestPlaceholders = [
-                      hostName: "w0wzahhsraincheck.netlify.app",
-                      defaultUrl: "https://w0wzahhsraincheck.netlify.app/",
-                      launcherName: "RainCheck",
-                      assetStatements: '[{"relation": ["delegate_permission/common.handle_all_urls"],' +
-                          '"target": {"namespace": "web", "site": "https://w0wzahhsraincheck.netlify.app"}}]'
-                  ]
               }
 
               signingConfigs {
@@ -122,8 +130,7 @@ jobs:
               buildTypes {
                   release {
                       signingConfig signingConfigs.release
-                      minifyEnabled true
-                      proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
+                      minifyEnabled false
                   }
               }
 
@@ -134,92 +141,218 @@ jobs:
           }
 
           dependencies {
-              implementation 'androidx.browser:browser:1.8.0'
-              implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.5.0'
+              implementation 'androidx.appcompat:appcompat:1.6.1'
+              implementation 'androidx.webkit:webkit:1.9.0'
+              implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
           }
           APP_GRADLE
 
-          # AndroidManifest.xml
+          # Main Activity - WebView based, works on ALL Android devices
+          cat > twa-app/app/src/main/java/app/netlify/raincheck/MainActivity.java << 'JAVA'
+          package app.netlify.raincheck;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.content.pm.ActivityInfo;
+          import android.graphics.Color;
+          import android.net.ConnectivityManager;
+          import android.net.NetworkInfo;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.View;
+          import android.view.Window;
+          import android.view.WindowManager;
+          import android.webkit.GeolocationPermissions;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.FrameLayout;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+
+          public class MainActivity extends Activity {
+
+              private static final String APP_URL = "https://w0wzahhsraincheck.netlify.app/";
+              private static final int LOCATION_PERMISSION_CODE = 1001;
+              private WebView webView;
+
+              @SuppressLint("SetJavaScriptEnabled")
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+
+                  // Fullscreen immersive
+                  requestWindowFeature(Window.FEATURE_NO_TITLE);
+                  getWindow().setFlags(
+                      WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                      WindowManager.LayoutParams.FLAG_FULLSCREEN
+                  );
+
+                  // Status bar color
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                      getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                      getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                      getWindow().setStatusBarColor(Color.parseColor("#0984e3"));
+                      getWindow().setNavigationBarColor(Color.parseColor("#0984e3"));
+                  }
+
+                  // Create WebView programmatically
+                  webView = new WebView(this);
+                  setContentView(webView);
+
+                  // Configure WebView
+                  WebSettings settings = webView.getSettings();
+                  settings.setJavaScriptEnabled(true);
+                  settings.setDomStorageEnabled(true);
+                  settings.setDatabaseEnabled(true);
+                  settings.setGeolocationEnabled(true);
+                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                  settings.setAllowFileAccess(false);
+                  settings.setAllowContentAccess(false);
+                  settings.setMediaPlaybackRequiresUserGesture(false);
+                  settings.setUseWideViewPort(true);
+                  settings.setLoadWithOverviewMode(true);
+                  settings.setSupportZoom(false);
+                  settings.setBuiltInZoomControls(false);
+
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                      settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+                  }
+
+                  // Handle navigation inside the app
+                  webView.setWebViewClient(new WebViewClient() {
+                      @Override
+                      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                          String url = request.getUrl().toString();
+                          if (url.contains("w0wzahhsraincheck.netlify.app") ||
+                              url.contains("open-meteo.com") ||
+                              url.contains("openstreetmap.org") ||
+                              url.contains("googleapis.com") ||
+                              url.contains("cdnjs.cloudflare.com")) {
+                              return false; // Load inside app
+                          }
+                          return false; // Keep everything in app
+                      }
+                  });
+
+                  // Handle geolocation permission
+                  webView.setWebChromeClient(new WebChromeClient() {
+                      @Override
+                      public void onGeolocationPermissionsShowPrompt(String origin,
+                              GeolocationPermissions.Callback callback) {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                              if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                                      != PackageManager.PERMISSION_GRANTED) {
+                                  requestPermissions(
+                                      new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                      LOCATION_PERMISSION_CODE
+                                  );
+                              }
+                          }
+                          callback.invoke(origin, true, false);
+                      }
+                  });
+
+                  webView.loadUrl(APP_URL);
+              }
+
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  if (webView != null) webView.onResume();
+              }
+
+              @Override
+              protected void onPause() {
+                  if (webView != null) webView.onPause();
+                  super.onPause();
+              }
+          }
+          JAVA
+
+          # Splash screen theme
+          cat > twa-app/app/src/main/res/values/styles.xml << 'STYLES'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="SplashTheme" parent="android:Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/splash_bg</item>
+              </style>
+          </resources>
+          STYLES
+
+          cat > twa-app/app/src/main/res/values-night/styles.xml << 'STYLESN'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="SplashTheme" parent="android:Theme.Light.NoTitleBar">
+                  <item name="android:windowBackground">@drawable/splash_bg</item>
+              </style>
+          </resources>
+          STYLESN
+
+          # Splash background drawable
+          cat > twa-app/app/src/main/res/drawable/splash_bg.xml << 'SPLASH'
+          <?xml version="1.0" encoding="utf-8"?>
+          <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+              <item>
+                  <shape android:shape="rectangle">
+                      <gradient
+                          android:startColor="#74b9ff"
+                          android:endColor="#0984e3"
+                          android:angle="135" />
+                  </shape>
+              </item>
+              <item
+                  android:gravity="center"
+                  android:width="128dp"
+                  android:height="128dp">
+                  <bitmap
+                      android:src="@mipmap/ic_launcher"
+                      android:gravity="center" />
+              </item>
+          </layer-list>
+          SPLASH
+
+          # AndroidManifest.xml - simple WebView, no Google deps
           cat > twa-app/app/src/main/AndroidManifest.xml << 'MANIFEST'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
               <application
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
-                  android:label="${launcherName}"
+                  android:label="RainCheck"
                   android:supportsRtl="true"
-                  android:theme="@android:style/Theme.Translucent.NoTitleBar">
-
-                  <meta-data
-                      android:name="asset_statements"
-                      android:value='${assetStatements}' />
+                  android:theme="@style/SplashTheme"
+                  android:usesCleartextTraffic="false"
+                  android:hardwareAccelerated="true">
 
                   <activity
-                      android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
-                      android:exported="true">
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                          android:value="${defaultUrl}" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.STATUS_BAR_COLOR"
-                          android:value="#0984e3" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.NAVIGATION_BAR_COLOR"
-                          android:value="#0984e3" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SPLASH_IMAGE_DRAWABLE"
-                          android:resource="@mipmap/ic_launcher" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_BACKGROUND_COLOR"
-                          android:value="#0984e3" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.SPLASH_SCREEN_FADE_OUT_DURATION"
-                          android:value="300" />
-
-                      <meta-data
-                          android:name="android.support.customtabs.trusted.FILE_PROVIDER_AUTHORITY"
-                          android:value="${applicationId}.fileprovider" />
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+                      android:screenOrientation="portrait">
 
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
-
-                      <intent-filter android:autoVerify="true">
-                          <action android:name="android.intent.action.VIEW" />
-                          <category android:name="android.intent.category.DEFAULT" />
-                          <category android:name="android.intent.category.BROWSABLE" />
-                          <data android:scheme="https"
-                              android:host="${hostName}" />
-                      </intent-filter>
                   </activity>
-
-                  <provider
-                      android:name="androidx.core.content.FileProvider"
-                      android:authorities="${applicationId}.fileprovider"
-                      android:grantUriPermissions="true"
-                      android:exported="false">
-                      <meta-data
-                          android:name="android.support.FILE_PROVIDER_PATHS"
-                          android:resource="@xml/filepaths" />
-                  </provider>
-
-                  <service
-                      android:name="com.google.androidbrowserhelper.trusted.DelegationService"
-                      android:enabled="true"
-                      android:exported="true">
-                      <intent-filter>
-                          <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
-                          <category android:name="android.intent.category.DEFAULT" />
-                      </intent-filter>
-                  </service>
               </application>
           </manifest>
           MANIFEST
@@ -232,20 +365,10 @@ jobs:
           </resources>
           STRINGS
 
-          # FileProvider paths
-          mkdir -p twa-app/app/src/main/res/xml
-          cat > twa-app/app/src/main/res/xml/filepaths.xml << 'FILEPATHS'
-          <?xml version="1.0" encoding="utf-8"?>
-          <paths>
-              <files-path name="images" path="images/" />
-          </paths>
-          FILEPATHS
-
       - name: Setup Gradle wrapper
         working-directory: twa-app
         run: |
           gradle wrapper --gradle-version 8.5 || true
-          # If gradle isn't available, download wrapper manually
           if [ ! -f gradlew ]; then
             curl -sL "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o gradle.zip
             unzip -q gradle.zip
@@ -262,6 +385,15 @@ jobs:
           find . -name "*.apk" -type f
           cp app/build/outputs/apk/release/app-release.apk ../raincheck.apk || true
 
+      - name: Verify APK
+        run: |
+          echo "=== APK Info ==="
+          ls -lh raincheck.apk
+          # Verify the APK is valid
+          $JAVA_HOME/bin/jarsigner -verify raincheck.apk || true
+          # Show APK details
+          $ANDROID_HOME/build-tools/*/aapt dump badging raincheck.apk 2>/dev/null | head -5 || true
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -273,25 +405,3 @@ jobs:
         with:
           name: raincheck-keystore
           path: raincheck.keystore
-
-      - name: Generate assetlinks.json
-        run: |
-          FINGERPRINT=$(keytool -list -v -keystore raincheck.keystore -alias raincheck -storepass raincheck123 | grep "SHA256:" | sed 's/.*SHA256: //')
-          echo "SHA-256 Fingerprint: $FINGERPRINT"
-          cat > assetlinks.json << EOF
-          [{
-            "relation": ["delegate_permission/common.handle_all_urls"],
-            "target": {
-              "namespace": "android_app",
-              "package_name": "app.netlify.w0wzahhsraincheck.twa",
-              "sha256_cert_fingerprints": ["$FINGERPRINT"]
-            }
-          }]
-          EOF
-          cat assetlinks.json
-
-      - name: Upload assetlinks.json
-        uses: actions/upload-artifact@v4
-        with:
-          name: assetlinks-json
-          path: assetlinks.json
