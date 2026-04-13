@@ -1055,11 +1055,12 @@ function updateAutoTheme() {
     document.body.classList.add(timeClass);
 }
 
-// ── Service Worker Cleanup ──
+// ── Service Worker Registration ──
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
-        if ('caches' in window) caches.keys().then(names => names.forEach(n => caches.delete(n)));
+        navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('SW registered, scope:', reg.scope))
+            .catch(err => console.log('SW registration failed:', err));
     });
 }
 
