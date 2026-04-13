@@ -66,7 +66,7 @@ jobs:
                   mavenCentral()
               }
               dependencies {
-                  classpath 'com.android.tools.build:gradle:8.2.2'
+                  classpath 'com.android.tools.build:gradle:8.5.2'
               }
           }
           allprojects {
@@ -91,7 +91,7 @@ jobs:
 
           # Gradle wrapper properties
           cat > twa-app/gradle/wrapper/gradle-wrapper.properties << 'WRAPPER'
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           zipStoreBase=GRADLE_USER_HOME
@@ -106,12 +106,12 @@ jobs:
 
           android {
               namespace 'app.netlify.raincheck'
-              compileSdk 33
+              compileSdk 34
 
               defaultConfig {
                   applicationId "app.netlify.raincheck"
                   minSdk 21
-                  targetSdk 33
+                  targetSdk 34
                   versionCode 1
                   versionName "1.0.0"
               }
@@ -152,8 +152,6 @@ jobs:
           import android.graphics.Color;
           import android.os.Build;
           import android.os.Bundle;
-          import android.view.View;
-          import android.view.Window;
           import android.view.WindowManager;
           import android.webkit.GeolocationPermissions;
           import android.webkit.WebChromeClient;
@@ -161,7 +159,6 @@ jobs:
           import android.webkit.WebSettings;
           import android.webkit.WebView;
           import android.webkit.WebViewClient;
-          import android.widget.FrameLayout;
           import android.widget.TextView;
           import android.Manifest;
           import android.content.pm.PackageManager;
@@ -176,76 +173,79 @@ jobs:
               @Override
               protected void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-
-                  // Status bar + nav bar color
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                      getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-                      getWindow().setStatusBarColor(Color.parseColor("#0984e3"));
-                      getWindow().setNavigationBarColor(Color.parseColor("#0984e3"));
-                  }
-
                   try {
+                      // Status bar + nav bar color
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                          getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                          getWindow().setStatusBarColor(Color.parseColor("#0984e3"));
+                          getWindow().setNavigationBarColor(Color.parseColor("#0984e3"));
+                      }
+
                       // Create WebView programmatically
                       webView = new WebView(this);
                       setContentView(webView);
-                  } catch (Exception e) {
-                      // WebView not available on this device
-                      TextView tv = new TextView(this);
-                      tv.setText("WebView is not available. Please update Android System WebView.");
-                      tv.setPadding(48, 48, 48, 48);
-                      tv.setTextSize(18);
-                      setContentView(tv);
-                      return;
-                  }
 
-                  // Configure WebView
-                  WebSettings settings = webView.getSettings();
-                  settings.setJavaScriptEnabled(true);
-                  settings.setDomStorageEnabled(true);
-                  settings.setDatabaseEnabled(true);
-                  settings.setGeolocationEnabled(true);
-                  settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-                  settings.setAllowFileAccess(false);
-                  settings.setAllowContentAccess(false);
-                  settings.setMediaPlaybackRequiresUserGesture(false);
-                  settings.setUseWideViewPort(true);
-                  settings.setLoadWithOverviewMode(true);
-                  settings.setSupportZoom(false);
-                  settings.setBuiltInZoomControls(false);
+                      // Configure WebView
+                      WebSettings settings = webView.getSettings();
+                      settings.setJavaScriptEnabled(true);
+                      settings.setDomStorageEnabled(true);
+                      settings.setDatabaseEnabled(true);
+                      settings.setGeolocationEnabled(true);
+                      settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                      settings.setAllowFileAccess(false);
+                      settings.setAllowContentAccess(false);
+                      settings.setMediaPlaybackRequiresUserGesture(false);
+                      settings.setUseWideViewPort(true);
+                      settings.setLoadWithOverviewMode(true);
+                      settings.setSupportZoom(false);
+                      settings.setBuiltInZoomControls(false);
 
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                      settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-                  }
-
-                  // Handle navigation inside the app
-                  webView.setWebViewClient(new WebViewClient() {
-                      @Override
-                      public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                          return false;
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                          settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
                       }
-                  });
 
-                  // Handle geolocation permission
-                  webView.setWebChromeClient(new WebChromeClient() {
-                      @Override
-                      public void onGeolocationPermissionsShowPrompt(String origin,
-                              GeolocationPermissions.Callback callback) {
-                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                              if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                                      != PackageManager.PERMISSION_GRANTED) {
-                                  requestPermissions(
-                                      new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-                                      LOCATION_PERMISSION_CODE
-                                  );
-                              }
+                      // Handle navigation inside the app
+                      webView.setWebViewClient(new WebViewClient() {
+                          @Override
+                          public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                              return false;
                           }
-                          callback.invoke(origin, true, false);
-                      }
-                  });
+                      });
 
-                  webView.loadUrl(APP_URL);
+                      // Handle geolocation permission
+                      webView.setWebChromeClient(new WebChromeClient() {
+                          @Override
+                          public void onGeolocationPermissionsShowPrompt(String origin,
+                                  GeolocationPermissions.Callback callback) {
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                  if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                                          != PackageManager.PERMISSION_GRANTED) {
+                                      requestPermissions(
+                                          new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                          LOCATION_PERMISSION_CODE
+                                      );
+                                  }
+                              }
+                              callback.invoke(origin, true, false);
+                          }
+                      });
+
+                      webView.loadUrl(APP_URL);
+
+                  } catch (Exception e) {
+                      try {
+                          TextView tv = new TextView(this);
+                          tv.setText("Error starting app: " + e.getMessage());
+                          tv.setPadding(48, 48, 48, 48);
+                          tv.setTextSize(16);
+                          setContentView(tv);
+                      } catch (Exception ignored) {
+                          finish();
+                      }
+                  }
               }
 
+              @SuppressWarnings("deprecation")
               @Override
               public void onBackPressed() {
                   if (webView != null && webView.canGoBack()) {
@@ -282,24 +282,14 @@ jobs:
           cat > twa-app/app/src/main/res/values/styles.xml << 'STYLES'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
-                  <item name="android:windowBackground">#0984e3</item>
-                  <item name="android:colorPrimary">#0984e3</item>
-                  <item name="android:statusBarColor">#0984e3</item>
-                  <item name="android:navigationBarColor">#0984e3</item>
-              </style>
+              <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
           </resources>
           STYLES
 
           cat > twa-app/app/src/main/res/values-night/styles.xml << 'STYLESN'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
-              <style name="AppTheme" parent="android:Theme.DeviceDefault.Light.NoActionBar">
-                  <item name="android:windowBackground">#0984e3</item>
-                  <item name="android:colorPrimary">#0984e3</item>
-                  <item name="android:statusBarColor">#0984e3</item>
-                  <item name="android:navigationBarColor">#0984e3</item>
-              </style>
+              <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
           </resources>
           STYLESN
 
@@ -320,7 +310,8 @@ jobs:
                   android:supportsRtl="true"
                   android:theme="@style/AppTheme"
                   android:usesCleartextTraffic="false"
-                  android:hardwareAccelerated="true">
+                  android:hardwareAccelerated="true"
+                  android:enableOnBackInvokedCallback="false">
 
                   <activity
                       android:name=".MainActivity"
@@ -348,12 +339,12 @@ jobs:
       - name: Setup Gradle wrapper
         working-directory: twa-app
         run: |
-          gradle wrapper --gradle-version 8.5 || true
+          gradle wrapper --gradle-version 8.7 || true
           if [ ! -f gradlew ]; then
-            curl -sL "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o gradle.zip
+            curl -sL "https://services.gradle.org/distributions/gradle-8.7-bin.zip" -o gradle.zip
             unzip -q gradle.zip
-            gradle-8.5/bin/gradle wrapper --gradle-version 8.5
-            rm -rf gradle-8.5 gradle.zip
+            gradle-8.7/bin/gradle wrapper --gradle-version 8.7
+            rm -rf gradle-8.7 gradle.zip
           fi
           chmod +x gradlew
 
