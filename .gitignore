@@ -5,3 +5,7 @@ dist/
 generate-icons.js
 .DS_Store
 Thumbs.db
+*.keystore
+*.jks
+*.keystore
+*.jks
