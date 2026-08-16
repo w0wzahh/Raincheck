@@ -1,0 +1,31 @@
+main>.panel,main>.two-column,main>.details-layout{margin-top:16px}.weather-content>.panel:first-child{margin-top:0}.map-panel{padding-bottom:14px}.radar-button:hover,.ghost-button:hover,.toolbar-button:hover{background:rgba(255,255,255,.12)}.setting-select{min-width:150px}.primary-button i,.ghost-button i{margin-right:6px}.map-panel .section-heading{margin-bottom:14px}.weather-map .leaflet-container{background:#172334}.leaflet-control-zoom a{color:#111}.install-button{margin-left:auto}
+.places-actions{flex-wrap:wrap}.places-comparison{margin-top:16px}.comparison-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.comparison-grid article{padding:14px;border-radius:14px;background:rgba(255,255,255,.045)}.comparison-grid strong,.comparison-grid span,.comparison-grid small,.comparison-grid em{display:block}.comparison-grid span{font-size:32px;font-weight:650;margin:8px 0}.comparison-grid small,.comparison-grid em{font-size:11px;color:var(--muted);font-style:normal;line-height:1.4}.comparison-loading{padding:18px;text-align:center;color:var(--muted)}
+
+/* RainCheck V10: clearer radar controls and branded icon */
+.brand-mark{padding:0;overflow:hidden;background:transparent;border-color:rgba(255,255,255,.12);box-shadow:0 10px 30px rgba(37,117,232,.18)}
+.brand-mark img{display:block;width:100%;height:100%;object-fit:cover}
+.radar-guide{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:-4px 0 14px}
+.radar-guide>div{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:13px;background:rgba(255,255,255,.035)}
+.radar-guide i{color:var(--accent);font-size:14px}
+.radar-guide strong,.radar-guide small{display:block}
+.radar-guide strong{font-size:11px}
+.radar-guide small{margin-top:2px;color:var(--muted);font-size:9px}
+.radar-badge{position:absolute;top:12px;left:12px;z-index:500;display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:rgba(5,10,18,.78);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(14px);font-size:10px}
+.radar-badge .pulse{width:6px;height:6px}
+.radar-badge span:last-child{color:#d4deeb}
+.radar-slider{flex:1;min-width:90px;accent-color:var(--accent)}
+.radar-slider:disabled{opacity:.4}
+.mobile-nav{display:none}
+
+/* RainCheck V10: creator identity and radar explanation */
+.section-subtitle{margin:7px 0 0;max-width:680px;color:var(--muted);font-size:12px;line-height:1.55}
+.creator-panel{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:18px;margin-top:16px;padding:18px 20px;background:linear-gradient(135deg,rgba(72,145,230,.08),rgba(255,255,255,.025))}
+.creator-mark{width:56px;height:56px;border-radius:16px;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.1);background:#081426;box-shadow:0 10px 28px rgba(0,0,0,.18)}
+.creator-mark img{width:100%;height:100%;display:block;object-fit:cover}
+.creator-copy h2{margin:3px 0 4px;font-size:18px}
+.creator-copy p{margin:0;color:var(--muted);font-size:11px;line-height:1.5;max-width:700px}
+.creator-link{white-space:nowrap;text-decoration:none}
+.creator-credit{display:flex;align-items:center;gap:10px;margin:12px 0 2px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035)}
+.creator-credit span{color:var(--muted);font-size:11px}.creator-credit strong{font-size:13px}.creator-credit a{margin-left:auto;color:var(--text);font-size:11px;text-decoration:none}.creator-credit a:hover{text-decoration:underline}
+.credits-body{display:grid;grid-template-columns:64px 1fr;gap:16px;align-items:start}.credits-body>img{width:64px;height:64px;border-radius:16px;object-fit:cover;background:#081426}.credits-body p{margin:0;line-height:1.55}.credits-body>small{grid-column:1/-1;color:var(--muted);line-height:1.5}
+@media(max-width:640px){.creator-panel{grid-template-columns:52px minmax(0,1fr);gap:13px;padding:16px}.creator-mark{width:52px;height:52px;border-radius:14px}.creator-copy h2{font-size:17px}.creator-copy p{font-size:11px}.creator-link{grid-column:1/-1;width:100%;justify-content:center}.credits-body{grid-template-columns:54px 1fr}.credits-body>img{width:54px;height:54px;border-radius:14px}}

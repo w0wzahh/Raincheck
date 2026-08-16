@@ -1,0 +1,52 @@
+{
+  "id": "./",
+  "name": "RainCheck",
+  "short_name": "RainCheck",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#081426",
+  "theme_color": "#081426",
+  "description": "A calm weather assistant for forecasts, rain timing, planning and radar.",
+  "lang": "en",
+  "categories": [
+    "weather",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192-pwa.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-pwa.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Check weather",
+      "short_name": "Weather",
+      "url": "./",
+      "description": "Open the RainCheck weather dashboard.",
+      "icons": [
+        {
+          "src": "icons/icon-192-pwa.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}

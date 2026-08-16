@@ -1,0 +1,378 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Generate signing keystore
+        run: |
+          keytool -genkeypair \
+            -alias raincheck \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -keystore ${{ github.workspace }}/raincheck.keystore \
+            -storepass raincheck123 \
+            -keypass raincheck123 \
+            -dname "CN=RainCheck, OU=Dev, O=RainCheck, L=Unknown, ST=Unknown, C=US"
+
+      - name: Create WebView Android project
+        run: |
+          mkdir -p twa-app/app/src/main/java/app/netlify/raincheck
+          mkdir -p twa-app/app/src/main/res/values
+          mkdir -p twa-app/app/src/main/res/mipmap-mdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-hdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-xhdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-xxhdpi
+          mkdir -p twa-app/app/src/main/res/mipmap-xxxhdpi
+          mkdir -p twa-app/app/src/main/res/values-night
+          mkdir -p twa-app/gradle/wrapper
+
+          # Download icons at all density sizes
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-72.png" \
+            -o twa-app/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-96.png" \
+            -o twa-app/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-144.png" \
+            -o twa-app/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-192.png" \
+            -o twa-app/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          curl -sL "https://w0wzahhsraincheck.netlify.app/icons/icon-512.png" \
+            -o twa-app/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+          # root build.gradle
+          cat > twa-app/build.gradle << 'GRADLE'
+          buildscript {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+              dependencies {
+                  classpath 'com.android.tools.build:gradle:8.5.2'
+              }
+          }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          GRADLE
+
+          # settings.gradle
+          cat > twa-app/settings.gradle << 'SETTINGS'
+          include ':app'
+          rootProject.name = "RainCheck"
+          SETTINGS
+
+          # gradle.properties
+          cat > twa-app/gradle.properties << 'PROPS'
+          android.useAndroidX=true
+          org.gradle.jvmargs=-Xmx2048m
+          PROPS
+
+          # Gradle wrapper properties
+          cat > twa-app/gradle/wrapper/gradle-wrapper.properties << 'WRAPPER'
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          WRAPPER
+
+          # app/build.gradle - WebView based, no Google dependencies
+          cat > twa-app/app/build.gradle << 'APP_GRADLE'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'app.netlify.raincheck'
+              compileSdk 34
+
+              defaultConfig {
+                  applicationId "app.netlify.raincheck"
+                  minSdk 21
+                  targetSdk 34
+                  versionCode 1
+                  versionName "1.0.0"
+              }
+
+              signingConfigs {
+                  release {
+                      storeFile file("${rootProject.projectDir}/../raincheck.keystore")
+                      storePassword "raincheck123"
+                      keyAlias "raincheck"
+                      keyPassword "raincheck123"
+                  }
+              }
+
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                      minifyEnabled false
+                  }
+              }
+
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_1_8
+                  targetCompatibility JavaVersion.VERSION_1_8
+              }
+          }
+
+          dependencies {
+          }
+          APP_GRADLE
+
+          # Main Activity - WebView based, works on ALL Android devices
+          # ZERO external dependencies - only android.* framework classes
+          cat > twa-app/app/src/main/java/app/netlify/raincheck/MainActivity.java << 'JAVA'
+          package app.netlify.raincheck;
+
+          import android.annotation.SuppressLint;
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import android.webkit.GeolocationPermissions;
+          import android.webkit.WebChromeClient;
+          import android.webkit.WebResourceRequest;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          import android.widget.TextView;
+          import android.Manifest;
+          import android.content.pm.PackageManager;
+
+          public class MainActivity extends Activity {
+
+              private static final String APP_URL = "https://w0wzahhsraincheck.netlify.app/";
+              private static final int LOCATION_PERMISSION_CODE = 1001;
+              private WebView webView;
+
+              @SuppressLint("SetJavaScriptEnabled")
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  try {
+                      // Status bar + nav bar color
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                          getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                          getWindow().setStatusBarColor(Color.parseColor("#0984e3"));
+                          getWindow().setNavigationBarColor(Color.parseColor("#0984e3"));
+                      }
+
+                      // Create WebView programmatically
+                      webView = new WebView(this);
+                      setContentView(webView);
+
+                      // Configure WebView
+                      WebSettings settings = webView.getSettings();
+                      settings.setJavaScriptEnabled(true);
+                      settings.setDomStorageEnabled(true);
+                      settings.setDatabaseEnabled(true);
+                      settings.setGeolocationEnabled(true);
+                      settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+                      settings.setAllowFileAccess(false);
+                      settings.setAllowContentAccess(false);
+                      settings.setMediaPlaybackRequiresUserGesture(false);
+                      settings.setUseWideViewPort(true);
+                      settings.setLoadWithOverviewMode(true);
+                      settings.setSupportZoom(false);
+                      settings.setBuiltInZoomControls(false);
+
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                          settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+                      }
+
+                      // Handle navigation inside the app
+                      webView.setWebViewClient(new WebViewClient() {
+                          @Override
+                          public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                              return false;
+                          }
+                      });
+
+                      // Handle geolocation permission
+                      webView.setWebChromeClient(new WebChromeClient() {
+                          @Override
+                          public void onGeolocationPermissionsShowPrompt(String origin,
+                                  GeolocationPermissions.Callback callback) {
+                              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                                  if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                                          != PackageManager.PERMISSION_GRANTED) {
+                                      requestPermissions(
+                                          new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                          LOCATION_PERMISSION_CODE
+                                      );
+                                  }
+                              }
+                              callback.invoke(origin, true, false);
+                          }
+                      });
+
+                      webView.loadUrl(APP_URL);
+
+                  } catch (Exception e) {
+                      try {
+                          TextView tv = new TextView(this);
+                          tv.setText("Error starting app: " + e.getMessage());
+                          tv.setPadding(48, 48, 48, 48);
+                          tv.setTextSize(16);
+                          setContentView(tv);
+                      } catch (Exception ignored) {
+                          finish();
+                      }
+                  }
+              }
+
+              @SuppressWarnings("deprecation")
+              @Override
+              public void onBackPressed() {
+                  if (webView != null && webView.canGoBack()) {
+                      webView.goBack();
+                  } else {
+                      super.onBackPressed();
+                  }
+              }
+
+              @Override
+              protected void onResume() {
+                  super.onResume();
+                  if (webView != null) webView.onResume();
+              }
+
+              @Override
+              protected void onPause() {
+                  if (webView != null) webView.onPause();
+                  super.onPause();
+              }
+
+              @Override
+              protected void onDestroy() {
+                  if (webView != null) {
+                      webView.destroy();
+                      webView = null;
+                  }
+                  super.onDestroy();
+              }
+          }
+          JAVA
+
+          # App theme - ONLY built-in Android framework themes, no libraries
+          cat > twa-app/app/src/main/res/values/styles.xml << 'STYLES'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+          </resources>
+          STYLES
+
+          cat > twa-app/app/src/main/res/values-night/styles.xml << 'STYLESN'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar" />
+          </resources>
+          STYLESN
+
+          # AndroidManifest.xml - simple WebView, no Google deps
+          cat > twa-app/app/src/main/AndroidManifest.xml << 'MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="RainCheck"
+                  android:supportsRtl="true"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="false"
+                  android:hardwareAccelerated="true"
+                  android:enableOnBackInvokedCallback="false">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+                      android:screenOrientation="portrait">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          MANIFEST
+
+          # strings.xml
+          cat > twa-app/app/src/main/res/values/strings.xml << 'STRINGS'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <string name="app_name">RainCheck</string>
+          </resources>
+          STRINGS
+
+      - name: Setup Gradle wrapper
+        working-directory: twa-app
+        run: |
+          gradle wrapper --gradle-version 8.7 || true
+          if [ ! -f gradlew ]; then
+            curl -sL "https://services.gradle.org/distributions/gradle-8.7-bin.zip" -o gradle.zip
+            unzip -q gradle.zip
+            gradle-8.7/bin/gradle wrapper --gradle-version 8.7
+            rm -rf gradle-8.7 gradle.zip
+          fi
+          chmod +x gradlew
+
+      - name: Build APK
+        working-directory: twa-app
+        run: |
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          echo "=== Build outputs ==="
+          find . -name "*.apk" -type f
+          cp app/build/outputs/apk/release/app-release.apk ../raincheck.apk || true
+
+      - name: Verify APK
+        run: |
+          echo "=== APK Info ==="
+          ls -lh raincheck.apk
+          # Verify the APK is valid
+          $JAVA_HOME/bin/jarsigner -verify raincheck.apk || true
+          # Show APK details
+          $ANDROID_HOME/build-tools/*/aapt dump badging raincheck.apk 2>/dev/null | head -5 || true
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: raincheck-apk
+          path: raincheck.apk
+
+      - name: Upload keystore (save this!)
+        uses: actions/upload-artifact@v4
+        with:
+          name: raincheck-keystore
+          path: raincheck.keystore

@@ -1,0 +1,17 @@
+import {DEFAULT_SETTINGS,STORAGE_KEYS} from './config.js?v=10.0.0';
+const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)) ?? f}catch{return f}};
+const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}};
+export const getSettings=()=>({...DEFAULT_SETTINGS,...read(STORAGE_KEYS.settings,{})});
+export const saveSettings=patch=>{const next={...getSettings(),...patch};write(STORAGE_KEYS.settings,next);return next};
+export const getPlaces=()=>read(STORAGE_KEYS.places,[]);
+export const upsertPlace=p=>{const list=getPlaces().filter(x=>x.id!==p.id);list.unshift(p);write(STORAGE_KEYS.places,list.slice(0,12));return list};
+export const removePlace=id=>write(STORAGE_KEYS.places,getPlaces().filter(x=>x.id!==id));
+export const clearPlaces=()=>{try{localStorage.removeItem(STORAGE_KEYS.places)}catch{}};
+export const recordObservation=o=>{const list=read(STORAGE_KEYS.history,[]);const filtered=list.filter(x=>Math.abs(x.lat-o.lat)<.02&&Math.abs(x.lon-o.lon)<.02);filtered.unshift(o);write(STORAGE_KEYS.history,filtered.slice(0,96))};
+export const getHistory=(lat,lon)=>read(STORAGE_KEYS.history,[]).filter(x=>Math.abs(x.lat-lat)<.02&&Math.abs(x.lon-lon)<.02).slice(0,48);
+export const cacheWeather=(key,data)=>{const all=read(STORAGE_KEYS.cache,{});all[key]={data,at:Date.now()};write(STORAGE_KEYS.cache,all)};
+export const getCachedWeather=key=>read(STORAGE_KEYS.cache,{})[key]?.data||null;
+export const getLastLocation=()=>read(STORAGE_KEYS.lastLocation,null);
+export const setLastLocation=p=>write(STORAGE_KEYS.lastLocation,p);
+export const getRadarCache=()=>read(STORAGE_KEYS.radar,null);
+export const setRadarCache=v=>write(STORAGE_KEYS.radar,v);

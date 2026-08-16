@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.old
+*.backup
+generate-icons.js
+.DS_Store
+Thumbs.db

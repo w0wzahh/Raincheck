@@ -1,0 +1,24 @@
+name: RainCheck CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - run: npm run build
+      - name: Verify production files
+        shell: bash
+        run: |
+          test -f dist/index.html
+          test -f dist/sw.js
+          test -f dist/src/app.js
+          test -f dist/styles/base.css
+          test -f dist/manifest.json
