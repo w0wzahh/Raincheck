@@ -1,4 +1,4 @@
-﻿name: Build Android APK
+name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -43,20 +43,26 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Decode release keystore
+      - name: Restore Android release keystore
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/raincheck-release.keystore
-          chmod 600 android/raincheck-release.keystore
+          mkdir -p android/keystore
+          echo "$KEYSTORE_BASE64" | base64 --decode > android/keystore/raincheck-release.jks
+          chmod 600 android/keystore/raincheck-release.jks
+
+      - name: Verify release keystore
+        run: |
+          test -f android/keystore/raincheck-release.jks
+          echo "Release keystore restored successfully."
 
       - name: Build signed release APK
         working-directory: android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/raincheck-release.keystore
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/keystore/raincheck-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease --no-daemon
 
       - name: Verify APK signature
