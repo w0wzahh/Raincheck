@@ -16,5 +16,6 @@ export const DEFAULT_SETTINGS = {
   unit:'metric', theme:'auto', reducedMotion:false, notifications:false, defaultPlaceId:'',
   activityMode:'balanced', morningBriefing:true, eveningBriefing:true,
   notificationRainChance:60, notificationHeat:35, notificationWind:55,
-  commuteMinutes:30, radarAutoplay:false, scheduledBriefing:false
+  commuteMinutes:30, radarAutoplay:false, scheduledBriefing:false,
+  performanceMode:'auto', performanceFps:60, reduceEffects:false, reduceBlur:false, pauseRadarWhenHidden:true
 };
