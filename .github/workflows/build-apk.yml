@@ -1,4 +1,4 @@
-name: Build Android APK
+﻿name: Build Android APK
 
 on:
   workflow_dispatch:
@@ -354,7 +354,7 @@ jobs:
           ./gradlew assembleRelease --no-daemon --stacktrace
           echo "=== Build outputs ==="
           find . -name "*.apk" -type f
-          cp app/build/outputs/apk/release/app-release.apk ../raincheck.apk || true
+          cp app/build/outputs/apk/release/Raincheck.apk ../raincheck.apk || true
 
       - name: Verify APK
         run: |
@@ -376,3 +376,4 @@ jobs:
         with:
           name: raincheck-keystore
           path: raincheck.keystore
+
