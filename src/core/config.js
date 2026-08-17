@@ -1,4 +1,4 @@
-export const APP_VERSION = '10.0.0';
+export const APP_VERSION = '11.4.2';
 export const STORAGE_KEYS = {
   settings: 'raincheck_v7_settings',
   places: 'raincheck_v7_places',
@@ -13,9 +13,8 @@ export const WEATHER = {
 };
 export const weatherInfo = code => WEATHER[code] || ['Unknown','Weather conditions unavailable','cloud'];
 export const DEFAULT_SETTINGS = {
-  unit:'metric', theme:'auto', reducedMotion:false, notifications:false, defaultPlaceId:'',
+  unit:'metric', theme:'auto', reducedMotion:false, notifications:false, defaultPlaceId:'', performanceMode:'auto',
   activityMode:'balanced', morningBriefing:true, eveningBriefing:true,
   notificationRainChance:60, notificationHeat:35, notificationWind:55,
-  commuteMinutes:30, radarAutoplay:false, scheduledBriefing:false,
-  performanceMode:'auto', performanceFps:60, reduceEffects:false, reduceBlur:false, pauseRadarWhenHidden:true
+  commuteMinutes:30, radarAutoplay:false, scheduledBriefing:false
 };

@@ -1,10 +1,10 @@
-# RainCheck V10
+# RainCheck V11.4.2
 
 RainCheck is a responsive weather PWA built around one idea: **weather should help you make decisions, not just display numbers.**
 
 It combines Open-Meteo forecasts, RainViewer radar, OpenStreetMap/Leaflet mapping, local history, planning tools, weather intelligence, saved places, notifications and an installable PWA interface.
 
-## V10 highlights
+## V11 highlights
 
 - Responsive desktop and mobile dashboard with a consistent spacing system
 - Mobile bottom navigation and touch-friendly controls

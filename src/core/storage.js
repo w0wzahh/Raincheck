@@ -1,4 +1,4 @@
-import {DEFAULT_SETTINGS,STORAGE_KEYS} from './config.js?v=10.0.0';
+import {DEFAULT_SETTINGS,STORAGE_KEYS} from './config.js?v=11.4.2';
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)) ?? f}catch{return f}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch{return false}};
 export const getSettings=()=>({...DEFAULT_SETTINGS,...read(STORAGE_KEYS.settings,{})});

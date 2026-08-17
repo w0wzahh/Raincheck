@@ -1,0 +1,178 @@
+package com.w0wzahh.raincheck.widget;
+
+import android.app.PendingIntent;
+import android.appwidget.AppWidgetManager;
+import android.appwidget.AppWidgetProvider;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Bundle;
+import android.widget.RemoteViews;
+
+import com.w0wzahh.raincheck.MainActivity;
+import com.w0wzahh.raincheck.R;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class RainCheckWidgetProvider extends AppWidgetProvider {
+    private static final String PREFS = "raincheck_widget";
+    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
+
+    @Override
+    public void onUpdate(Context context, AppWidgetManager manager, int[] appWidgetIds) {
+        for (int id : appWidgetIds) {
+            updateWidgetFromCache(context, manager, id);
+        }
+        refreshAll(context);
+    }
+
+    @Override
+    public void onEnabled(Context context) {
+        updateAll(context);
+        refreshAll(context);
+    }
+
+    @Override
+    public void onRestored(Context context, int[] oldWidgetIds, int[] newWidgetIds) {
+        updateAll(context);
+        refreshAll(context);
+    }
+
+    public static void updateAll(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, RainCheckWidgetProvider.class));
+        for (int id : ids) updateWidgetFromCache(context, manager, id);
+    }
+
+    private static void refreshAll(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (!prefs.contains("lat") || !prefs.contains("lon")) return;
+        EXECUTOR.execute(() -> {
+            try {
+                double lat = prefs.getFloat("lat", 0f);
+                double lon = prefs.getFloat("lon", 0f);
+                String unit = prefs.getString("unit", "metric");
+                String temperatureUnit = "imperial".equals(unit) ? "fahrenheit" : "celsius";
+                String endpoint = String.format(Locale.US,
+                    "https://api.open-meteo.com/v1/forecast?latitude=%.5f&longitude=%.5f&current=temperature_2m,apparent_temperature,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&temperature_unit=%s&forecast_days=1&timezone=auto",
+                    lat, lon, temperatureUnit);
+                HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(8000);
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("Accept", "application/json");
+                if (connection.getResponseCode() < 200 || connection.getResponseCode() >= 300) throw new IllegalStateException("Weather request failed");
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                StringBuilder body = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) body.append(line);
+                reader.close();
+                connection.disconnect();
+
+                JSONObject root = new JSONObject(body.toString());
+                JSONObject current = root.getJSONObject("current");
+                JSONObject daily = root.getJSONObject("daily");
+                JSONArray highs = daily.getJSONArray("temperature_2m_max");
+                JSONArray lows = daily.getJSONArray("temperature_2m_min");
+
+                prefs.edit()
+                    .putFloat("temperature", (float) current.getDouble("temperature_2m"))
+                    .putFloat("feelsLike", (float) current.getDouble("apparent_temperature"))
+                    .putFloat("high", (float) highs.getDouble(0))
+                    .putFloat("low", (float) lows.getDouble(0))
+                    .putInt("weatherCode", current.getInt("weather_code"))
+                    .putBoolean("isDay", current.optInt("is_day", 1) == 1)
+                    .putLong("updatedAt", System.currentTimeMillis())
+                    .apply();
+
+                updateAllFromStoredValues(context);
+            } catch (Exception ignored) {
+                // Keep the last successful widget state. Offline should never blank the widget.
+            }
+        });
+    }
+
+    private static void updateAllFromStoredValues(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(new ComponentName(context, RainCheckWidgetProvider.class));
+        for (int id : ids) updateWidgetFromCache(context, manager, id);
+    }
+
+    private static void updateWidgetFromCache(Context context, AppWidgetManager manager, int id) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_raincheck);
+
+        String city = prefs.getString("city", "Open RainCheck");
+        String unit = prefs.getString("unit", "metric");
+        String degree = "imperial".equals(unit) ? "°F" : "°C";
+        boolean hasWeather =
+            prefs.contains("temperature") &&
+            prefs.contains("updatedAt") &&
+            prefs.getLong("updatedAt", 0L) > 0L;
+
+        float temp = prefs.getFloat("temperature", 0f);
+        float feels = prefs.getFloat("feelsLike", 0f);
+        float high = prefs.getFloat("high", 0f);
+        float low = prefs.getFloat("low", 0f);
+        int code = prefs.getInt("weatherCode", -1);
+        long updated = prefs.getLong("updatedAt", 0L);
+
+        views.setTextViewText(R.id.widget_city, city);
+        if (hasWeather) {
+            views.setTextViewText(R.id.widget_temperature, String.format(Locale.getDefault(), "%.0f%s", temp, degree));
+            views.setTextViewText(R.id.widget_condition, condition(code));
+            views.setTextViewText(R.id.widget_details, String.format(Locale.getDefault(), "Feels %.0f%s  ·  H %.0f%s  L %.0f%s", feels, degree, high, degree, low, degree));
+            views.setTextViewText(R.id.widget_updated, updated > 0 ? "Updated " + relativeTime(updated) : "Updated just now");
+            views.setViewVisibility(R.id.widget_temperature, android.view.View.VISIBLE);
+        } else {
+            views.setTextViewText(R.id.widget_temperature, "--°");
+            views.setTextViewText(R.id.widget_condition, "Open RainCheck to set a city");
+            views.setTextViewText(R.id.widget_details, "Weather will appear here automatically");
+            views.setTextViewText(R.id.widget_updated, "Ready");
+        }
+
+        Intent launch = new Intent(context, MainActivity.class);
+        launch.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        launch.setData(Uri.parse("raincheck://widget"));
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, id, launch,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_root, pendingIntent);
+        manager.updateAppWidget(id, views);
+    }
+
+    private static String relativeTime(long updated) {
+        long minutes = Math.max(0, (System.currentTimeMillis() - updated) / 60000);
+        if (minutes < 1) return "just now";
+        if (minutes < 60) return minutes + "m ago";
+        long hours = minutes / 60;
+        return hours + "h ago";
+    }
+
+    private static String condition(int code) {
+        switch (code) {
+            case 0: return "☀ Clear";
+            case 1: return "☀ Mostly clear";
+            case 2: return "⛅ Partly cloudy";
+            case 3: return "☁ Overcast";
+            case 45: case 48: return "〰 Foggy";
+            case 51: case 53: case 55: return "☂ Drizzle";
+            case 61: case 63: case 65: case 80: case 81: case 82: return "☂ Rain";
+            case 66: case 67: return "❄ Freezing rain";
+            case 71: case 73: case 75: case 77: case 85: case 86: return "❄ Snow";
+            case 95: case 96: case 99: return "⚡ Thunderstorm";
+            default: return "Weather unavailable";
+        }
+    }
+}

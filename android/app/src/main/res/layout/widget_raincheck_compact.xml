@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="11dp" android:orientation="vertical" android:background="@drawable/widget_background_day">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <ImageView android:id="@+id/widget_weather_icon" android:layout_width="24dp" android:layout_height="24dp" android:contentDescription="Weather" />
+        <TextView android:id="@+id/widget_city" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="7dp" android:text="Küçükçekmece" android:textSize="13sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/widget_updated" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="now" android:textSize="8sp" android:maxLines="1" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:orientation="horizontal">
+        <TextView android:id="@+id/widget_temperature" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="27°C" android:textSize="34sp" android:textStyle="bold" android:includeFontPadding="false" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="9dp" android:orientation="vertical">
+            <TextView android:id="@+id/widget_condition" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear" android:textSize="12sp" android:textStyle="bold" android:maxLines="1" />
+            <TextView android:id="@+id/widget_high_low" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:text="H 28°C  L 21°C" android:textSize="9sp" android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/widget_detail_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+        <TextView android:id="@+id/widget_rain" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Rain 10%" android:textSize="9sp" android:maxLines="1" />
+        <TextView android:id="@+id/widget_wind" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center" android:text="Wind 12 km/h" android:textSize="9sp" android:maxLines="1" />
+        <TextView android:id="@+id/widget_uv" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:gravity="right" android:text="UV 6" android:textSize="9sp" android:maxLines="1" />
+    </LinearLayout>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <ImageView android:id="@+id/widget_condition_icon" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_feels" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <LinearLayout android:id="@+id/widget_metrics_row" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+</LinearLayout>

@@ -1,4 +1,4 @@
-import {getSettings} from '../core/storage.js?v=10.0.0';
+import {getSettings} from '../core/storage.js?v=11.4.2';
 let lastNotice=0;
 export async function enableNotifications(){if(!('Notification'in window))return'unsupported';return Notification.requestPermission()}
 export function maybeNotify(alerts,place){if(!('Notification'in window)||Notification.permission!=='granted')return;const now=Date.now();if(now-lastNotice<60*60e3)return;const important=alerts.find(a=>a.level==='high'||a.level==='medium');if(!important)return;lastNotice=now;new Notification(`RainCheck · ${important.title}`,{body:`${place.name}: ${important.text}`,icon:'./icons/icon-192.png',tag:'raincheck-weather'})}

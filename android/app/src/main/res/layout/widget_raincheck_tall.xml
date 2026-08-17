@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="9dp" android:background="@drawable/widget_background_day">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical">
+        <ImageView android:id="@+id/widget_weather_icon" android:layout_width="32dp" android:layout_height="32dp" android:contentDescription="Weather" />
+        <TextView android:id="@+id/widget_temperature" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:text="27°C" android:textSize="23sp" android:textStyle="bold" android:includeFontPadding="false" />
+        <TextView android:id="@+id/widget_condition" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:gravity="center" android:text="Clear" android:textSize="10sp" android:textStyle="bold" android:maxLines="1" />
+    </LinearLayout>
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <TextView android:id="@+id/widget_city" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_updated" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <ImageView android:id="@+id/widget_condition_icon" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_feels" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_high_low" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <LinearLayout android:id="@+id/widget_detail_row" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_rain" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_wind" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <TextView android:id="@+id/widget_uv" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+    <LinearLayout android:id="@+id/widget_metrics_row" android:layout_width="1dp" android:layout_height="1dp" android:visibility="gone" />
+</FrameLayout>

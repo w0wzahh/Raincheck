@@ -1,7 +1,8 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Raincheck</string>
     <string name="title_activity_main">Raincheck</string>
     <string name="package_name">com.w0wzahh.raincheck</string>
     <string name="custom_url_scheme">com.w0wzahh.raincheck</string>
+    <string name="widget_description">RainCheck weather at a glance</string>
 </resources>

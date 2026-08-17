@@ -1,13 +1,13 @@
-const CACHE = 'raincheck-v10';
+const CACHE = 'raincheck-v11';
 const CORE = [
   './', './index.html', './manifest.json',
   './styles/base.css', './styles/components.css', './styles/responsive.css',
-  './src/app.js?v=10.0.0', './src/core/config.js?v=10.0.0', './src/core/storage.js?v=10.0.0',
-  './src/api/weather.js?v=10.0.0', './src/api/geocoding.js?v=10.0.0', './src/api/history.js?v=10.0.0',
-  './src/features/intelligence.js?v=10.0.0', './src/features/notifications.js?v=10.0.0',
-  './src/features/forecast.js?v=10.0.0', './src/features/timeline.js?v=10.0.0',
-  './src/features/planner.js?v=10.0.0', './src/features/share.js?v=10.0.0', './src/features/map.js?v=10.0.0',
-  './src/ui/render.js?v=10.0.0',
+  './src/app.js?v=11.4.2', './src/core/config.js?v=11.4.2', './src/core/storage.js?v=11.4.2',
+  './src/api/weather.js?v=11.4.2', './src/api/geocoding.js?v=11.4.2', './src/api/history.js?v=11.4.2',
+  './src/features/intelligence.js?v=11.4.2', './src/features/notifications.js?v=11.4.2',
+  './src/features/forecast.js?v=11.4.2', './src/features/timeline.js?v=11.4.2',
+  './src/features/planner.js?v=11.4.2', './src/features/share.js?v=11.4.2', './src/features/map.js?v=11.4.2',
+  './src/ui/render.js?v=11.4.2',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-512-maskable.png', './icons/icon.svg'
 ];
 

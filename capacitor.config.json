@@ -1,5 +1,13 @@
-﻿{
+{
   "appId": "com.w0wzahh.raincheck",
   "appName": "Raincheck",
-  "webDir": "dist"
+  "webDir": "dist",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DEFAULT",
+      "hidden": false,
+      "animation": "NONE"
+    }
+  }
 }

@@ -119,9 +119,9 @@ jobs:
               signingConfigs {
                   release {
                       storeFile file("${rootProject.projectDir}/../raincheck.keystore")
-                      storePassword "raincheck123"
-                      keyAlias "raincheck"
-                      keyPassword "raincheck123"
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
                   }
               }
 

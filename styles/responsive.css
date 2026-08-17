@@ -27,7 +27,7 @@
 @media (max-width: 640px){
   :root{--mobile-gutter:12px}
   html{scroll-padding-top:10px}
-  body{padding-bottom:74px}
+  body{padding-bottom:calc(74px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
   .app-shell{width:calc(100% - 24px)}
   .topbar{padding:10px 0 8px;min-height:64px}
   .brand{gap:9px}
@@ -110,18 +110,18 @@
   .empty-actions{flex-direction:column}
   .error-banner{margin-bottom:10px}
 
-  .modal{padding:10px}
-  .modal-panel{max-height:calc(100vh - 20px);border-radius:20px}
+  .modal{padding:calc(10px + var(--safe-area-inset-top,env(safe-area-inset-top,0px))) calc(10px + var(--safe-area-inset-right,env(safe-area-inset-right,0px))) calc(10px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))) calc(10px + var(--safe-area-inset-left,env(safe-area-inset-left,0px)))}
+  .modal-panel{max-height:calc(100dvh - 20px - var(--safe-area-inset-top,env(safe-area-inset-top,0px)) - var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));border-radius:20px;overscroll-behavior:contain}
   .modal-head,.modal-body{padding:18px}
   .setting-row{align-items:flex-start;flex-direction:column;gap:12px}
   .setting-row>*:last-child{align-self:stretch}
   .setting-select,.number-input{width:100%}
   .places-actions{display:grid;grid-template-columns:1fr;gap:7px}
   .place-row{grid-template-columns:28px 1fr auto 22px}
-  .scroll-top-btn{right:16px;bottom:86px}
+  .scroll-top-btn{right:16px;bottom:calc(86px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
   footer{display:none}
 
-  .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(4,1fr);left:8px;right:8px;bottom:8px;z-index:60;padding:6px;border:1px solid var(--line);border-radius:18px;background:rgba(8,13,22,.88);backdrop-filter:blur(8px);box-shadow:0 18px 50px rgba(0,0,0,.35);padding-bottom:max(6px,env(safe-area-inset-bottom))}
+  .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(4,1fr);left:8px;right:8px;bottom:calc(8px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));z-index:60;padding:6px;border:1px solid var(--line);border-radius:18px;background:rgba(8,13,22,.88);backdrop-filter:blur(20px);box-shadow:0 18px 50px rgba(0,0,0,.35);padding-bottom:max(6px,env(safe-area-inset-bottom))}
   body[data-theme="light"] .mobile-nav{background:rgba(255,255,255,.92)}
   .mobile-nav-item{border:0;background:transparent;color:var(--muted);border-radius:13px;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:10px}
   .mobile-nav-item i{font-size:16px}

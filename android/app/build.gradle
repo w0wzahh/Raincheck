@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+def versionFile = rootProject.file("../VERSION")
+def appVersion = versionFile.exists() ? versionFile.text.trim() : "0.0.0"
+def versionParts = appVersion.tokenize(".")
+if (versionParts.size() != 3 || versionParts.any { !it.isInteger() }) {
+    throw new GradleException("Invalid VERSION: '${appVersion}'. Expected MAJOR.MINOR.PATCH")
+}
+def versionMajor = versionParts[0].toInteger()
+def versionMinor = versionParts[1].toInteger()
+def versionPatch = versionParts[2].toInteger()
+def appVersionCode = (versionMajor * 10000) + (versionMinor * 100) + versionPatch
+
 android {
     namespace = "com.w0wzahh.raincheck"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -8,8 +19,8 @@ android {
         applicationId "com.w0wzahh.raincheck"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode appVersionCode
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
@@ -19,10 +30,16 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("../keystore/raincheck-release.jks")
-            storePassword "062007"
-            keyAlias "raincheck"
-            keyPassword "062007"
+            def keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+            def keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            def keyAliasValue = System.getenv("ANDROID_KEY_ALIAS")
+            def keyPasswordValue = System.getenv("ANDROID_KEY_PASSWORD")
+            if (keystorePath && keystorePassword && keyAliasValue && keyPasswordValue) {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            }
         }
     }
 
@@ -33,6 +50,14 @@ android {
             signingConfig signingConfigs.release
 
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (variant.buildType.name == "release") {
+                output.outputFileName = "Raincheck.apk"
+            }
         }
     }
 }

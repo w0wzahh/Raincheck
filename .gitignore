@@ -14,3 +14,9 @@ Thumbs.db
 android/keystore/
 *.jks
 *.keystore
+
+# Android release signing material
+android/keystore/*.jks
+android/*.keystore
+*.jks
+*.keystore

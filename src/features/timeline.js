@@ -1,4 +1,4 @@
-import {weatherInfo} from '../core/config.js?v=10.0.0';
+import {weatherInfo} from '../core/config.js?v=11.4.2';
 
 const PERIODS = [
   ['Morning', 6, 11, 'sunrise'],
