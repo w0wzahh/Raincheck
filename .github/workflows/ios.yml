@@ -1,0 +1,72 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - "src/**"
+      - "styles/**"
+      - "public/**"
+      - "ios/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.json"
+      - "build.js"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  build-ios:
+    name: Build Raincheck for iOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Show iOS SDK
+        run: xcodebuild -showsdks
+
+      - name: Build iOS
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Locate iOS build products
+        run: |
+          echo "=== iOS build products ==="
+          find ios/App/build -type f | sort
+
+      - name: Upload iOS build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Raincheck-iOS-build
+          path: ios/App/build/Build/Products/Release-iphoneos/
+          if-no-files-found: error
