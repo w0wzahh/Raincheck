@@ -111,7 +111,8 @@
   .error-banner{margin-bottom:10px}
 
   .modal{padding:calc(10px + var(--safe-area-inset-top,env(safe-area-inset-top,0px))) calc(10px + var(--safe-area-inset-right,env(safe-area-inset-right,0px))) calc(10px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))) calc(10px + var(--safe-area-inset-left,env(safe-area-inset-left,0px)))}
-  .modal-panel{max-height:calc(100dvh - 20px - var(--safe-area-inset-top,env(safe-area-inset-top,0px)) - var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));border-radius:20px;overscroll-behavior:contain}
+  .modal-panel{max-height:calc(var(--vvh,100dvh) - 20px - var(--safe-area-inset-top,env(safe-area-inset-top,0px)) - var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)));border-radius:20px;overscroll-behavior:contain}
+  .modal input,.modal select,.search-shell input{font-size:16px}
   .modal-head,.modal-body{padding:18px}
   .modal-body{padding-bottom:calc(18px + var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px)))}
   .setting-row{align-items:flex-start;flex-direction:column;gap:12px}

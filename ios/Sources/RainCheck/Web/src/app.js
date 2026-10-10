@@ -42,6 +42,8 @@ const setLoading=v=>els.loading.classList.toggle('hidden',!v);
 const setError=m=>{els.error.classList.toggle('hidden',!m);if(m)els.errorText.textContent=m};
 const openModal=id=>$('#'+id)?.classList.remove('hidden'),closeModal=id=>$('#'+id)?.classList.add('hidden');
 document.addEventListener('touchmove',e=>{if(document.querySelector('.modal:not(.hidden)')&&!e.target.closest('.modal-panel'))e.preventDefault()},{passive:false});
+const vv=window.visualViewport;if(vv){const setVVH=()=>document.documentElement.style.setProperty('--vvh',vv.height+'px');vv.addEventListener('resize',setVVH);vv.addEventListener('scroll',setVVH);setVVH()}
+document.addEventListener('focusin',e=>{const p=e.target.closest?.('.modal-panel');if(p)setTimeout(()=>e.target.scrollIntoView({block:'center'}),350)});
 function reportRuntimeError(err){console.error('RainCheck runtime error',err);setLoading(false);if(!state.weather){els.empty.classList.remove('hidden');setError(`RainCheck could not finish loading. ${err?.message||'Try searching for a city or refreshing.'}`)}}
 async function syncNativeWidget(){
  const plugin=RainCheckWidget||resolveRainCheckWidget();

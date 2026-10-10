@@ -23,6 +23,7 @@ struct WebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.scrollView.keyboardDismissMode = .interactive
         webView.load(URLRequest(url: WebApp.startURL))
         return webView
     }
