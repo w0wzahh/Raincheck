@@ -28,6 +28,24 @@ struct RainCheckEntry: TimelineEntry {
     var weatherCode: Int = -1
     var isDay: Bool = true
     var unit: String = "metric"
+    var hourly: [HourlyPoint] = []
+    var daily: [DailyPoint] = []
+}
+
+struct HourlyPoint: Sendable {
+    var time: Date
+    var temp: Double
+    var code: Int
+    var isDay: Bool
+    var precip: Int?
+}
+
+struct DailyPoint: Sendable {
+    var date: Date
+    var code: Int
+    var hi: Double
+    var lo: Double
+    var precip: Int?
 }
 
 private let appGroup = "group.com.w0wzahh.raincheck"
@@ -80,12 +98,24 @@ struct Provider: TimelineProvider {
     }
 
     private func sampleEntry() -> RainCheckEntry {
-        RainCheckEntry(
-            date: Date(), configured: true, city: "RainCheck",
+        let now = Date()
+        var e = RainCheckEntry(
+            date: now, configured: true, city: "RainCheck",
             temperature: 21, feelsLike: 20, high: 24, low: 15,
             rainChance: 60, windSpeed: 12, humidity: 58,
             weatherCode: 3, isDay: true
         )
+        e.hourly = (0..<8).map { (i: Int) -> HourlyPoint in
+            HourlyPoint(time: now.addingTimeInterval(TimeInterval(i * 3600)),
+                        temp: 21 - Double(i), code: [1, 2, 3, 61][i % 4],
+                        isDay: i < 6, precip: i > 3 ? 55 : nil)
+        }
+        e.daily = (0..<5).map { (i: Int) -> DailyPoint in
+            DailyPoint(date: now.addingTimeInterval(TimeInterval(i * 86400)),
+                       code: [1, 2, 3, 61, 0][i], hi: 24 - Double(i),
+                       lo: 15 - Double(i), precip: i == 3 ? 70 : nil)
+        }
+        return e
     }
 
     private func loadEntry() async -> RainCheckEntry {
@@ -177,6 +207,63 @@ struct Provider: TimelineProvider {
         return (json["city"] as? String ?? "Current Location", lat, lon)
     }
 
+    static func parseHourly(_ hourly: [String: Any]?) -> [HourlyPoint] {
+        guard let hourly,
+              let times = hourly["time"] as? [String],
+              let temps = hourly["temperature_2m"] as? [Double?],
+              let codes = hourly["weather_code"] as? [Int?]
+        else { return [] }
+        let isDay = hourly["is_day"] as? [Int?] ?? []
+        let precip = hourly["precipitation_probability"] as? [Int?] ?? []
+
+        var formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let now = Date()
+        var points: [HourlyPoint] = []
+        for (i, s) in times.enumerated() {
+            guard let t = formatter.date(from: s), t >= now,
+                  let temp = temps.indices.contains(i) ? temps[i] : nil,
+                  let code = codes.indices.contains(i) ? codes[i] : nil
+            else { continue }
+            points.append(HourlyPoint(
+                time: t, temp: temp, code: code,
+                isDay: isDay.indices.contains(i) ? (isDay[i] ?? 1) == 1 : true,
+                precip: precip.indices.contains(i) ? precip[i] ?? nil : nil
+            ))
+            if points.count == 8 { break }
+        }
+        return points
+    }
+
+    static func parseDaily(_ daily: [String: Any]) -> [DailyPoint] {
+        guard let times = daily["time"] as? [String],
+              let highs = daily["temperature_2m_max"] as? [Double?],
+              let lows = daily["temperature_2m_min"] as? [Double?],
+              let codes = daily["weather_code"] as? [Int?]
+        else { return [] }
+        let precip = daily["precipitation_probability_max"] as? [Int?] ?? []
+
+        var formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        var points: [DailyPoint] = []
+        for (i, s) in times.enumerated() {
+            guard let d = formatter.date(from: s),
+                  let hi = highs.indices.contains(i) ? highs[i] : nil,
+                  let lo = lows.indices.contains(i) ? lows[i] : nil,
+                  let code = codes.indices.contains(i) ? codes[i] : nil
+            else { continue }
+            points.append(DailyPoint(
+                date: d, code: code, hi: hi, lo: lo,
+                precip: precip.indices.contains(i) ? precip[i] ?? nil : nil
+            ))
+        }
+        return points
+    }
+
     static func reverseGeocode(_ location: CLLocation) async -> String? {
         try? await CLGeocoder().reverseGeocodeLocation(location)
             .first?.locality
@@ -192,11 +279,13 @@ struct Provider: TimelineProvider {
             .init(name: "longitude", value: String(format: "%.5f", lon)),
             .init(name: "current",
                   value: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,is_day,wind_speed_10m"),
+            .init(name: "hourly",
+                  value: "temperature_2m,weather_code,is_day,precipitation_probability"),
             .init(name: "daily",
-                  value: "temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max"),
+                  value: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max"),
             .init(name: "temperature_unit", value: tempUnit),
             .init(name: "wind_speed_unit", value: "kmh"),
-            .init(name: "forecast_days", value: "1"),
+            .init(name: "forecast_days", value: "5"),
             .init(name: "timezone", value: "auto"),
         ]
         guard let url = c.url else { return nil }
@@ -214,7 +303,7 @@ struct Provider: TimelineProvider {
         let rain = daily["precipitation_probability_max"] as? [Int]
         let uv = daily["uv_index_max"] as? [Double]
 
-        let entry = RainCheckEntry(
+        var entry = RainCheckEntry(
             date: Date(), configured: true, city: city,
             temperature: current["temperature_2m"] as? Double,
             feelsLike: current["apparent_temperature"] as? Double,
@@ -226,6 +315,8 @@ struct Provider: TimelineProvider {
             isDay: (current["is_day"] as? Int ?? 1) == 1,
             unit: unit
         )
+        entry.hourly = Self.parseHourly(json["hourly"] as? [String: Any])
+        entry.daily = Self.parseDaily(daily)
 
         var cache: [String: Any] = [
             "city": entry.city, "weatherCode": entry.weatherCode,
@@ -353,23 +444,79 @@ struct RainCheckWidgetEntryView: View {
         }
     }
 
+    private static let hourFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "ha"
+        return f
+    }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE"
+        return f
+    }()
+
+    private func conditionName(_ code: Int) -> String {
+        switch code {
+        case 0: return "Clear"
+        case 1: return "Mostly Clear"
+        case 2: return "Partly Cloudy"
+        case 3: return "Cloudy"
+        case 45, 48: return "Foggy"
+        case 51...57: return "Drizzle"
+        case 61...67: return "Rain"
+        case 71...77: return "Snow"
+        case 80...82: return "Showers"
+        case 85, 86: return "Snow"
+        case 95...99: return "Thunderstorm"
+        default: return ""
+        }
+    }
+
+    private func hourLabel(_ date: Date, isFirst: Bool) -> String {
+        isFirst ? "Now" : Self.hourFormatter.string(from: date).lowercased()
+    }
+
+    private func dayLabel(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? "Today"
+            : Self.weekdayFormatter.string(from: date)
+    }
+
+    private var rainBadge: Int? {
+        guard let r = entry.rainChance, r >= 20 else { return nil }
+        return r
+    }
+
+    // MARK: - Small — city, icon, big temp, condition, H/L
+
     private var smallBody: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
-                    .font(.title2)
-                Spacer()
-                if let rain = entry.rainChance, rain >= 30 {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(entry.city)
+                    .font(.system(.subheadline, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .overlay(alignment: .trailing) {
+                if let rain = rainBadge {
                     Label("\(rain)%", systemImage: "drop.fill")
-                        .font(.caption.bold())
+                        .font(.caption2.bold())
                         .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
                 }
             }
-            Spacer()
-            Text(entry.city).font(.caption).lineLimit(1)
             if let t = entry.temperature {
-                Text("\(Int(t.rounded()))\(degreeUnit)")
-                    .font(.system(size: 34, weight: .semibold))
+                Text("\(Int(t.rounded()))°")
+                    .font(.system(size: 44, weight: .medium, design: .rounded))
+            }
+            Spacer(minLength: 2)
+            HStack(alignment: .center, spacing: 4) {
+                Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
+                    .font(.title3)
+                Text(conditionName(entry.weatherCode))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
             if let hi = entry.high, let lo = entry.low {
                 Text("H:\(Int(hi.rounded()))°  L:\(Int(lo.rounded()))°")
@@ -380,82 +527,189 @@ struct RainCheckWidgetEntryView: View {
         .padding()
     }
 
-    private var mediumBody: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(entry.city).font(.caption).lineLimit(1)
-                if let t = entry.temperature {
-                    Text("\(Int(t.rounded()))\(degreeUnit)")
-                        .font(.system(size: 42, weight: .semibold))
-                }
-                if let f = entry.feelsLike {
-                    Text("Feels \(Int(f.rounded()))°")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 6) {
-                Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
-                    .font(.system(size: 34))
-                if let rain = entry.rainChance {
-                    Label("Rain \(rain)%", systemImage: "drop.fill")
-                        .font(.caption.bold())
-                        .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
-                }
-                if let hi = entry.high, let lo = entry.low {
-                    Text("H:\(Int(hi.rounded()))° L:\(Int(lo.rounded()))°")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding()
-    }
+    // MARK: - Medium — current conditions + hourly strip
 
-    private var largeBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.city).font(.subheadline).lineLimit(1)
+    private var mediumBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(entry.city)
+                        .font(.system(.subheadline, weight: .semibold))
+                        .lineLimit(1)
                     if let t = entry.temperature {
-                        Text("\(Int(t.rounded()))\(degreeUnit)")
-                            .font(.system(size: 56, weight: .semibold))
-                    }
-                    if let f = entry.feelsLike {
-                        Text("Feels like \(Int(f.rounded()))°")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Text("\(Int(t.rounded()))°")
+                            .font(.system(size: 44, weight: .medium, design: .rounded))
                     }
                 }
                 Spacer()
-                Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
-                    .font(.system(size: 52))
+                VStack(alignment: .trailing, spacing: 4) {
+                    Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
+                        .font(.system(size: 30))
+                    Text(conditionName(entry.weatherCode))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    if let hi = entry.high, let lo = entry.low {
+                        Text("H:\(Int(hi.rounded()))°  L:\(Int(lo.rounded()))°")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
-            Divider().overlay(.white.opacity(0.2))
-            HStack(spacing: 0) {
-                metric(icon: "drop.fill",
-                       value: entry.rainChance.map { "\($0)%" } ?? "--",
-                       label: "Rain")
-                metric(icon: "wind",
-                       value: entry.windSpeed.map { "\(Int($0.rounded()))" } ?? "--",
-                       label: "km/h")
-                metric(icon: "humidity.fill",
-                       value: entry.humidity.map { "\(Int($0.rounded()))%" } ?? "--",
-                       label: "Humidity")
-                metric(icon: "thermometer.medium",
-                       value: (entry.high != nil && entry.low != nil)
-                           ? "\(Int(entry.high!.rounded()))/\(Int(entry.low!.rounded()))°" : "--",
-                       label: "H/L")
+            Spacer(minLength: 0)
+            if !entry.hourly.isEmpty {
+                HStack(spacing: 0) {
+                    ForEach(entry.hourly.prefix(5).indices, id: \.self) { i in
+                        let h = entry.hourly[i]
+                        VStack(spacing: 3) {
+                            Text(hourLabel(h.time, isFirst: i == 0))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: symbolName(code: h.code, isDay: h.isDay))
+                                .font(.caption)
+                            if let p = h.precip, p >= 20 {
+                                Text("\(p)%")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
+                            } else {
+                                Text(" ")
+                                    .font(.system(size: 8))
+                            }
+                            Text("\(Int(h.temp.rounded()))°")
+                                .font(.caption.bold())
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
             }
         }
         .padding()
     }
 
-    private func metric(icon: String, value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon).font(.caption).foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
-            Text(value).font(.subheadline.bold())
-            Text(label).font(.caption2).foregroundStyle(.secondary)
+    // MARK: - Large — header, hourly strip, daily rows with temp bars
+
+    private var largeBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(entry.city)
+                        .font(.system(.subheadline, weight: .semibold))
+                        .lineLimit(1)
+                    if let t = entry.temperature {
+                        Text("\(Int(t.rounded()))°")
+                            .font(.system(size: 56, weight: .medium, design: .rounded))
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Image(systemName: symbolName(code: entry.weatherCode, isDay: entry.isDay))
+                        .font(.system(size: 40))
+                    Text(conditionName(entry.weatherCode))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let rain = rainBadge {
+                        Label("\(rain)%", systemImage: "drop.fill")
+                            .font(.caption.bold())
+                            .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
+                    }
+                }
+            }
+            if let hi = entry.high, let lo = entry.low {
+                Text("H:\(Int(hi.rounded()))°  L:\(Int(lo.rounded()))°")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !entry.hourly.isEmpty {
+                Divider().overlay(.white.opacity(0.15))
+                HStack(spacing: 0) {
+                    ForEach(entry.hourly.prefix(6).indices, id: \.self) { i in
+                        let h = entry.hourly[i]
+                        VStack(spacing: 4) {
+                            Text(hourLabel(h.time, isFirst: i == 0))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Image(systemName: symbolName(code: h.code, isDay: h.isDay))
+                                .font(.subheadline)
+                            if let p = h.precip, p >= 20 {
+                                Text("\(p)%")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
+                            } else {
+                                Text(" ")
+                                    .font(.system(size: 9))
+                            }
+                            Text("\(Int(h.temp.rounded()))°")
+                                .font(.caption.bold())
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            if !entry.daily.isEmpty {
+                Divider().overlay(.white.opacity(0.15))
+                VStack(spacing: 6) {
+                    ForEach(entry.daily.prefix(5).indices, id: \.self) { i in
+                        dailyRow(entry.daily[i])
+                    }
+                }
+            }
         }
-        .frame(maxWidth: .infinity)
+        .padding()
+    }
+
+    private var weeklyRange: ClosedRange<Double> {
+        let los = entry.daily.map(\.lo)
+        let his = entry.daily.map(\.hi)
+        guard let minLo = los.min(), let maxHi = his.max(), maxHi > minLo else {
+            return 0...1
+        }
+        return minLo...maxHi
+    }
+
+    private func dailyRow(_ day: DailyPoint) -> some View {
+        let range = weeklyRange
+        let span = max(range.upperBound - range.lowerBound, 1)
+        return HStack(spacing: 8) {
+            Text(dayLabel(day.date))
+                .font(.caption)
+                .frame(width: 44, alignment: .leading)
+            Image(systemName: symbolName(code: day.code, isDay: true))
+                .font(.caption)
+                .frame(width: 20)
+                .overlay(alignment: .bottom) {
+                    if let p = day.precip, p >= 20 {
+                        Text("\(p)%")
+                            .font(.system(size: 7))
+                            .foregroundStyle(Color(red: 0.61, green: 0.79, blue: 1.0))
+                            .offset(y: 8)
+                    }
+                }
+            Text("\(Int(day.lo.rounded()))°")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 28, alignment: .trailing)
+            GeometryReader { geo in
+                let w = geo.size.width
+                let x0 = (day.lo - range.lowerBound) / span * w
+                let x1 = (day.hi - range.lowerBound) / span * w
+                ZStack(alignment: .leading) {
+                    Capsule().fill(.white.opacity(0.15))
+                    Capsule()
+                        .fill(LinearGradient(
+                            colors: [Color(red: 0.36, green: 0.65, blue: 1.0),
+                                     Color(red: 1.0, green: 0.65, blue: 0.3)],
+                            startPoint: .leading, endPoint: .trailing
+                        ))
+                        .frame(width: max(x1 - x0, 6))
+                        .offset(x: x0)
+                }
+            }
+            .frame(height: 4)
+            Text("\(Int(day.hi.rounded()))°")
+                .font(.caption)
+                .frame(width: 28, alignment: .trailing)
+        }
     }
 }
 
