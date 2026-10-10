@@ -1,0 +1,86 @@
+name: Update Releases
+
+on:
+  workflow_run:
+    workflows:
+      - "Build Android APK"
+      - "Build iOS"
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release-android:
+    name: Publish Android APK to release
+    if: >-
+      github.event.workflow_run.name == 'Build Android APK' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout at triggering commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download signed APK artifact
+        run: gh run download "${{ github.event.workflow_run.id }}" -n Raincheck-V11-release -D apk
+
+      - name: Update GitHub release
+        run: |
+          set -e
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          TAG="v${VERSION}-android"
+          ASSET="Raincheck-v${VERSION}.apk"
+          mv apk/Raincheck.apk "$ASSET"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "RainCheck ${VERSION} - Android" \
+              --notes "Signed release APK built by CI (Capacitor). Download and open on your Android device to install."
+          fi
+
+  release-ios:
+    name: Publish iOS build to release
+    if: >-
+      github.event.workflow_run.name == 'Build iOS' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout at triggering commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Download iOS build artifact
+        run: gh run download "${{ github.event.workflow_run.id }}" -n Raincheck-iOS-build -D ios-out
+
+      - name: Package IPA
+        run: |
+          set -e
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          mkdir -p Payload
+          cp -r ios-out/App.app Payload/
+          zip -qr "Raincheck-v${VERSION}.ipa" Payload
+
+      - name: Update GitHub release
+        run: |
+          set -e
+          VERSION=$(tr -d '[:space:]' < VERSION)
+          TAG="v${VERSION}-ios"
+          ASSET="Raincheck-v${VERSION}.ipa"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+          else
+            gh release create "$TAG" "$ASSET" \
+              --title "RainCheck ${VERSION} - iOS" \
+              --notes "iOS build (unsigned IPA) built by CI from the Capacitor project. Sideload with AltStore, Sideloadly, TrollStore, or install from source with xtool (see ios/README.md)."
+          fi
