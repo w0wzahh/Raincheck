@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import WidgetKit
 
 enum WebApp {
     static let scheme = "raincheck"
@@ -19,6 +20,34 @@ struct WebView: UIViewRepresentable {
             forURLScheme: WebApp.scheme
         )
 
+        // Minimal Capacitor-compatible shim: the web app only uses
+        // window.Capacitor for RainCheckWidget sync, which we forward to
+        // the message handler below (shared defaults + WidgetKit reload).
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: """
+            window.Capacitor = {
+                isNativePlatform: function() { return true; },
+                getPlatform: function() { return 'ios'; },
+                Plugins: {},
+                registerPlugin: function(name) {
+                    var plugin = {
+                        updateWidget: function(payload) {
+                            return new Promise(function(resolve) {
+                                window.webkit.messageHandlers.raincheckWidget.postMessage(payload || {});
+                                resolve({ updated: true });
+                            });
+                        }
+                    };
+                    window.Capacitor.Plugins[name] = plugin;
+                    return plugin;
+                }
+            };
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+        configuration.userContentController.add(context.coordinator, name: "raincheckWidget")
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -30,7 +59,28 @@ struct WebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {}
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == "raincheckWidget",
+                  let body = message.body as? [String: Any]
+            else { return }
+
+            let store = UserDefaults(suiteName: "group.com.w0wzahh.raincheck") ?? .standard
+            for key in ["city", "unit", "theme"] {
+                if let v = body[key] as? String { store.set(v, forKey: key) }
+            }
+            for key in ["lat", "lon", "temperature", "feelsLike", "high", "low",
+                        "rainChance", "windSpeed", "humidity", "uvIndex", "weatherCode"] {
+                if let v = body[key] as? NSNumber { store.set(v.doubleValue, forKey: key) }
+            }
+            if let v = body["isDay"] as? Bool { store.set(v, forKey: "isDay") }
+            store.set(Date().timeIntervalSince1970 * 1000, forKey: "updatedAt")
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+
         func webView(
             _ webView: WKWebView,
             decidePolicyFor navigationAction: WKNavigationAction,

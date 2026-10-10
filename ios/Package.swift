@@ -9,11 +9,13 @@ let package = Package(
         .macOS(.v14),
     ],
     products: [
-        // An xtool project should contain exactly one library product,
-        // representing the main app.
         .library(
             name: "RainCheck",
             targets: ["RainCheck"]
+        ),
+        .library(
+            name: "RainCheckWidget",
+            targets: ["RainCheckWidget"]
         ),
     ],
     targets: [
@@ -21,6 +23,12 @@ let package = Package(
             name: "RainCheck",
             resources: [
                 .copy("Web"),
+            ]
+        ),
+        .target(
+            name: "RainCheckWidget",
+            linkerSettings: [
+                .unsafeFlags(["-Xlinker", "-u", "-Xlinker", "_main"]),
             ]
         ),
     ]

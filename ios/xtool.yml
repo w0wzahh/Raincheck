@@ -1,4 +1,8 @@
 version: 1
 bundleID: com.w0wzahh.RainCheck
+product: RainCheck
 iconPath: AppIcon.png
 infoPath: Support/Info.plist
+extensions:
+  - product: RainCheckWidget
+    infoPath: RainCheckWidget-Info.plist
