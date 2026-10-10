@@ -56,8 +56,10 @@ struct Provider: TimelineProvider {
         let done = SendableBox(completion)
         Task {
             let entry = await timedLoad()
-            // Same cadence as Android: updatePeriodMillis=1800000.
-            let next = Date().addingTimeInterval(30 * 60)
+            // Same cadence as Android: updatePeriodMillis=1800000 —
+            // but retry in a minute when we have nothing to show, so the
+            // widget self-heals once location auth lands.
+            let next = Date().addingTimeInterval(entry.configured ? 30 * 60 : 60)
             done.call(Timeline(entries: [entry], policy: .after(next)))
         }
     }
@@ -96,12 +98,17 @@ struct Provider: TimelineProvider {
             return cachedOrSetup()
         }
 
-        guard let location = await WidgetLocation().current() else {
+        var lat: Double, lon: Double, city: String
+        if let location = await WidgetLocation().current() {
+            lat = location.coordinate.latitude
+            lon = location.coordinate.longitude
+            city = await Self.reverseGeocode(location) ?? "Current Location"
+        } else if let ip = await Self.ipLocation() {
+            // No permission needed — coarse but always available.
+            lat = ip.lat; lon = ip.lon; city = ip.city
+        } else {
             return cachedOrSetup()
         }
-        let lat = location.coordinate.latitude
-        let lon = location.coordinate.longitude
-        let city = await Self.reverseGeocode(location) ?? "Current Location"
         UserDefaults(suiteName: cacheSuite)?.set(
             ["lat": lat, "lon": lon, "city": city], forKey: "lastLocation"
         )
@@ -149,6 +156,19 @@ struct Provider: TimelineProvider {
             isDay: w["isDay"] as? Bool ?? true,
             unit: w["unit"] as? String ?? "metric"
         )
+    }
+
+    /// Coarse location via IP geolocation — works without any permission.
+    static func ipLocation() async -> (city: String, lat: Double, lon: Double)? {
+        guard let url = URL(string: "https://ipapi.co/json/") else { return nil }
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 6
+        guard let (data, _) = try? await URLSession(configuration: config).data(from: url),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let lat = json["latitude"] as? Double,
+              let lon = json["longitude"] as? Double
+        else { return nil }
+        return (json["city"] as? String ?? "Current Location", lat, lon)
     }
 
     static func reverseGeocode(_ location: CLLocation) async -> String? {
