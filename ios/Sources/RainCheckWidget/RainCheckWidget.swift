@@ -49,16 +49,31 @@ struct Provider: TimelineProvider {
             return
         }
         let done = SendableBox(completion)
-        Task { done.call(await loadEntry()) }
+        Task { done.call(await timedLoad()) }
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<RainCheckEntry>) -> Void) {
         let done = SendableBox(completion)
         Task {
-            let entry = await loadEntry()
+            let entry = await timedLoad()
             // Same cadence as Android: updatePeriodMillis=1800000.
             let next = Date().addingTimeInterval(30 * 60)
             done.call(Timeline(entries: [entry], policy: .after(next)))
+        }
+    }
+
+    /// WidgetKit abandons timelines that don't answer quickly — race the
+    /// real load against a timeout so we always complete.
+    private func timedLoad() async -> RainCheckEntry {
+        await withTaskGroup(of: RainCheckEntry.self) { group in
+            group.addTask { await self.loadEntry() }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 9_000_000_000)
+                return self.cachedOrSetup()
+            }
+            let entry = await group.next()!
+            group.cancelAll()
+            return entry
         }
     }
 
@@ -158,8 +173,11 @@ struct Provider: TimelineProvider {
             .init(name: "forecast_days", value: "1"),
             .init(name: "timezone", value: "auto"),
         ]
-        guard let url = c.url,
-              let (data, _) = try? await URLSession.shared.data(from: url),
+        guard let url = c.url else { return nil }
+        let sessionConfig = URLSessionConfiguration.ephemeral
+        sessionConfig.timeoutIntervalForRequest = 8
+        sessionConfig.timeoutIntervalForResource = 8
+        guard let (data, _) = try? await URLSession(configuration: sessionConfig).data(from: url),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let current = json["current"] as? [String: Any]
         else { return nil }
@@ -202,12 +220,18 @@ struct Provider: TimelineProvider {
     }
 }
 
-final class WidgetLocation: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
+@MainActor
+final class WidgetLocation: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation?, Never>?
+    private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
 
     func current() async -> CLLocation? {
-        let status = manager.authorizationStatus
+        manager.delegate = self
+        var status = manager.authorizationStatus
+        if status == .notDetermined {
+            status = await requestAuthorization()
+        }
         guard status == .authorizedWhenInUse || status == .authorizedAlways else {
             return nil
         }
@@ -223,22 +247,41 @@ final class WidgetLocation: NSObject, CLLocationManagerDelegate, @unchecked Send
         }
     }
 
+    private func requestAuthorization() async -> CLAuthorizationStatus {
+        await withCheckedContinuation { cont in
+            authContinuation = cont
+            manager.requestWhenInUseAuthorization()
+        }
+    }
+
     private func requestLocation() async -> CLLocation? {
         await withCheckedContinuation { cont in
             continuation = cont
-            manager.delegate = self
             manager.requestLocation()
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        continuation?.resume(returning: locations.last)
-        continuation = nil
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        Task { @MainActor in
+            guard let cont = authContinuation else { return }
+            authContinuation = nil
+            cont.resume(returning: status)
+        }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        continuation?.resume(returning: nil)
-        continuation = nil
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            continuation?.resume(returning: locations.last)
+            continuation = nil
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            continuation?.resume(returning: nil)
+            continuation = nil
+        }
     }
 }
 
