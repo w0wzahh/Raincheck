@@ -122,8 +122,9 @@ public class RainCheckWidgetProvider extends AppWidgetProvider {
                     "https://api.open-meteo.com/v1/forecast" +
                     "?latitude=%.5f&longitude=%.5f" +
                     "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,is_day,wind_speed_10m" +
-                    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max" +
-                    "&temperature_unit=%s&wind_speed_unit=kmh&forecast_days=1&timezone=auto",
+                    "&hourly=temperature_2m,weather_code,is_day,precipitation_probability" +
+                    "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max" +
+                    "&temperature_unit=%s&wind_speed_unit=kmh&forecast_days=5&timezone=auto",
                     lat, lon, temperatureUnit
                 );
 
@@ -152,6 +153,69 @@ public class RainCheckWidgetProvider extends AppWidgetProvider {
                 JSONArray rain = daily.optJSONArray("precipitation_probability_max");
                 JSONArray uv = daily.optJSONArray("uv_index_max");
 
+                // Hourly strip data: next 8 hours as "HH|temp|code|isDay|precip"
+                // entries. Fault-tolerant — a malformed forecast block must not
+                // kill the headline refresh.
+                StringBuilder hourlyCsv = new StringBuilder();
+                try {
+                    JSONObject hourly = root.optJSONObject("hourly");
+                    if (hourly != null) {
+                        JSONArray hTimes = hourly.optJSONArray("time");
+                        JSONArray hTemps = hourly.optJSONArray("temperature_2m");
+                        JSONArray hCodes = hourly.optJSONArray("weather_code");
+                        JSONArray hDay = hourly.optJSONArray("is_day");
+                        JSONArray hPrecip = hourly.optJSONArray("precipitation_probability");
+                        if (hTimes != null && hTemps != null && hCodes != null) {
+                            java.text.SimpleDateFormat iso = new java.text.SimpleDateFormat(
+                                "yyyy-MM-dd'T'HH:mm", Locale.US);
+                            java.text.SimpleDateFormat hourFmt = new java.text.SimpleDateFormat(
+                                "ha", Locale.US);
+                            String nowIso = new java.text.SimpleDateFormat(
+                                "yyyy-MM-dd'T'HH:mm", Locale.US).format(new java.util.Date());
+                            int count = 0;
+                            for (int i = 0; i < hTimes.length() && count < 8; i++) {
+                                String ts = hTimes.optString(i);
+                                if (ts.compareTo(nowIso) < 0) continue;
+                                java.util.Date t = iso.parse(ts);
+                                String label = count == 0 ? "Now" : hourFmt.format(t).toLowerCase(Locale.US);
+                                hourlyCsv.append(label).append('|')
+                                    .append(hTemps.optDouble(i, Double.NaN)).append('|')
+                                    .append(hCodes.optInt(i, -1)).append('|')
+                                    .append(hDay == null ? 1 : hDay.optInt(i, 1)).append('|')
+                                    .append(hPrecip == null ? -1 : hPrecip.optInt(i, -1)).append(';');
+                                count++;
+                            }
+                        }
+                    }
+                } catch (Exception ex) {
+                    Log.w(TAG, "Hourly forecast parse failed", ex);
+                }
+
+                // Daily rows: "EEE|code|hi|lo|precip" for up to 5 days.
+                StringBuilder dailyCsv = new StringBuilder();
+                try {
+                    JSONArray dTimes = daily.optJSONArray("time");
+                    JSONArray dCodes = daily.optJSONArray("weather_code");
+                    if (dTimes != null && dCodes != null) {
+                        java.text.SimpleDateFormat isoD = new java.text.SimpleDateFormat(
+                            "yyyy-MM-dd", Locale.US);
+                        java.text.SimpleDateFormat dayFmt = new java.text.SimpleDateFormat(
+                            "EEE", Locale.getDefault());
+                        for (int i = 0; i < dTimes.length() && i < 5; i++) {
+                            String ts = dTimes.optString(i);
+                            java.util.Date t = isoD.parse(ts);
+                            String name = i == 0 ? "Today" : dayFmt.format(t);
+                            dailyCsv.append(name).append('|')
+                                .append(dCodes.optInt(i, -1)).append('|')
+                                .append(highs.optDouble(i, Double.NaN)).append('|')
+                                .append(lows.optDouble(i, Double.NaN)).append('|')
+                                .append(rain == null ? -1 : rain.optInt(i, -1)).append(';');
+                        }
+                    }
+                } catch (Exception ex) {
+                    Log.w(TAG, "Daily forecast parse failed", ex);
+                }
+
                 SharedPreferences.Editor editor = prefs.edit()
                     .putFloat("temperature", (float) current.getDouble("temperature_2m"))
                     .putFloat("feelsLike", (float) current.getDouble("apparent_temperature"))
@@ -163,6 +227,8 @@ public class RainCheckWidgetProvider extends AppWidgetProvider {
                     .putFloat("windSpeed", (float) current.optDouble("wind_speed_10m", Float.NaN))
                     .putFloat("rainChance", rain == null ? Float.NaN : (float) rain.optDouble(0, Double.NaN))
                     .putFloat("uvIndex", uv == null ? Float.NaN : (float) uv.optDouble(0, Double.NaN))
+                    .putString("hourly", hourlyCsv.toString())
+                    .putString("daily", dailyCsv.toString())
                     .putLong("updatedAt", System.currentTimeMillis());
 
                 if (!editor.commit()) throw new IllegalStateException("Could not persist widget state");
@@ -231,6 +297,7 @@ public class RainCheckWidgetProvider extends AppWidgetProvider {
         }
 
         applyTheme(views, context, theme, code);
+        renderForecast(views, prefs, degree, hasWeather);
 
         Intent launch = new Intent(context, MainActivity.class);
         launch.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -299,6 +366,96 @@ public class RainCheckWidgetProvider extends AppWidgetProvider {
             case 95: case 96: case 99: return R.drawable.widget_background_storm;
             case 0: case 1: return R.drawable.widget_background_clear;
             default: return R.drawable.widget_background_day;
+        }
+    }
+
+    // Hourly strip + daily rows are optional sections: layouts that include
+    // them get real data, layouts without them simply skip the calls.
+    private static void renderForecast(RemoteViews views, SharedPreferences prefs, String degree, boolean hasWeather) {
+        int[] hourBoxes = {
+            R.id.hour1, R.id.hour2, R.id.hour3, R.id.hour4, R.id.hour5, R.id.hour6
+        };
+        int[] hourLabels = {
+            R.id.hour1_label, R.id.hour2_label, R.id.hour3_label,
+            R.id.hour4_label, R.id.hour5_label, R.id.hour6_label
+        };
+        int[] hourIcons = {
+            R.id.hour1_icon, R.id.hour2_icon, R.id.hour3_icon,
+            R.id.hour4_icon, R.id.hour5_icon, R.id.hour6_icon
+        };
+        int[] hourTemps = {
+            R.id.hour1_temp, R.id.hour2_temp, R.id.hour3_temp,
+            R.id.hour4_temp, R.id.hour5_temp, R.id.hour6_temp
+        };
+        int[] dayBoxes = {
+            R.id.day1, R.id.day2, R.id.day3, R.id.day4, R.id.day5
+        };
+        int[] dayNames = {
+            R.id.day1_name, R.id.day2_name, R.id.day3_name, R.id.day4_name, R.id.day5_name
+        };
+        int[] dayIcons = {
+            R.id.day1_icon, R.id.day2_icon, R.id.day3_icon, R.id.day4_icon, R.id.day5_icon
+        };
+        int[] dayRanges = {
+            R.id.day1_range, R.id.day2_range, R.id.day3_range, R.id.day4_range, R.id.day5_range
+        };
+
+        views.setViewVisibility(R.id.widget_hourly, View.GONE);
+        views.setViewVisibility(R.id.widget_daily, View.GONE);
+        if (!hasWeather) return;
+
+        String hourly = prefs.getString("hourly", "");
+        if (hourly != null && !hourly.isEmpty()) {
+            String[] rows = hourly.split(";");
+            int used = 0;
+            for (int i = 0; i < rows.length && used < hourBoxes.length; i++) {
+                String[] f = rows[i].split("\\|");
+                if (f.length < 5) continue;
+                int box = hourBoxes[used];
+                views.setViewVisibility(box, View.VISIBLE);
+                views.setTextViewText(hourLabels[used], f[0]);
+                try {
+                    views.setTextViewText(hourTemps[used],
+                        String.format(Locale.getDefault(), "%.0f%s", Double.parseDouble(f[1]), degree));
+                } catch (NumberFormatException ignored) {
+                    views.setTextViewText(hourTemps[used], "--" + degree);
+                }
+                int c = -1;
+                try { c = Integer.parseInt(f[2]); } catch (NumberFormatException ignored) {}
+                int p = -1;
+                try { p = Integer.parseInt(f[4]); } catch (NumberFormatException ignored) {}
+                views.setImageViewResource(hourIcons[used], weatherIcon(c));
+                views.setTextViewText(hourLabels[used],
+                    p >= 20 ? f[0] + " · " + p + "%" : f[0]);
+                used++;
+            }
+            if (used > 0) views.setViewVisibility(R.id.widget_hourly, View.VISIBLE);
+        }
+
+        String daily = prefs.getString("daily", "");
+        if (daily != null && !daily.isEmpty()) {
+            String[] rows = daily.split(";");
+            int used = 0;
+            for (int i = 0; i < rows.length && used < dayBoxes.length; i++) {
+                String[] f = rows[i].split("\\|");
+                if (f.length < 5) continue;
+                int box = dayBoxes[used];
+                views.setViewVisibility(box, View.VISIBLE);
+                views.setTextViewText(dayNames[used], f[0]);
+                int c = -1;
+                try { c = Integer.parseInt(f[1]); } catch (NumberFormatException ignored) {}
+                double hi = Double.NaN, lo = Double.NaN;
+                try { hi = Double.parseDouble(f[2]); } catch (NumberFormatException ignored) {}
+                try { lo = Double.parseDouble(f[3]); } catch (NumberFormatException ignored) {}
+                int p = -1;
+                try { p = Integer.parseInt(f[4]); } catch (NumberFormatException ignored) {}
+                views.setImageViewResource(dayIcons[used], weatherIcon(c));
+                String range = (Double.isNaN(lo) ? "--" : String.format(Locale.getDefault(), "%.0f", lo))
+                    + degree + " – " + (Double.isNaN(hi) ? "--" : String.format(Locale.getDefault(), "%.0f", hi)) + degree;
+                views.setTextViewText(dayRanges[used], p >= 20 ? p + "%  " + range : range);
+                used++;
+            }
+            if (used > 0) views.setViewVisibility(R.id.widget_daily, View.VISIBLE);
         }
     }
 

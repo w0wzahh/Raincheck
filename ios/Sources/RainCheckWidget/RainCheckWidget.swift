@@ -122,36 +122,54 @@ struct Provider: TimelineProvider {
         // 1. App-group store (provisioned when the entitlement is available),
         // 2. the widget's own cache written after a successful location fetch.
         if let stored = Self.storedLocation() {
-            if let entry = await fetchEntry(lat: stored.lat, lon: stored.lon, city: stored.city) {
+            if var entry = await fetchEntry(lat: stored.lat, lon: stored.lon, city: stored.city) {
+                entry = withAppSnapshot(entry)
                 return entry
             }
             return cachedOrSetup()
         }
 
-        // Race precise location against IP geolocation — whichever
-        // resolves first wins, so a stalled auth prompt can't starve us.
-        let found = await withTaskGroup(
-            of: (city: String, lat: Double, lon: Double)?.self
-        ) { group in
-            group.addTask {
-                guard let loc = await WidgetLocation().current() else { return nil }
-                let city = await Self.reverseGeocode(loc) ?? "Current Location"
-                return (city, loc.coordinate.latitude, loc.coordinate.longitude)
-            }
-            group.addTask { await Self.ipLocation() }
-            var result: (city: String, lat: Double, lon: Double)? = nil
-            for await r in group where r != nil { result = r; break }
-            group.cancelAll()
-            return result
+        // Prefer precise device location (matches the app's coordinates);
+        // IP geolocation runs in parallel as the guaranteed fallback.
+        async let ip = Self.ipLocation()
+        var found: (city: String, lat: Double, lon: Double)? = nil
+        if let loc = await WidgetLocation().current() {
+            let city = await Self.reverseGeocode(loc) ?? "Current Location"
+            found = (city, loc.coordinate.latitude, loc.coordinate.longitude)
+        } else {
+            found = await ip
         }
         guard let (city, lat, lon) = found else { return cachedOrSetup() }
         UserDefaults(suiteName: cacheSuite)?.set(
             ["lat": lat, "lon": lon, "city": city], forKey: "lastLocation"
         )
-        if let entry = await fetchEntry(lat: lat, lon: lon, city: city) {
+        if var entry = await fetchEntry(lat: lat, lon: lon, city: city) {
+            entry = withAppSnapshot(entry)
             return entry
         }
         return cachedOrSetup()
+    }
+
+    /// When the containing app has synced weather into the shared store,
+    /// prefer its headline values so the widget matches the app exactly.
+    private func withAppSnapshot(_ entry: RainCheckEntry) -> RainCheckEntry {
+        guard let d = UserDefaults(suiteName: appGroup),
+              let updatedAt = d.object(forKey: "updatedAt") as? Double,
+              Date().timeIntervalSince1970 * 1000 - updatedAt < 45 * 60 * 1000
+        else { return entry }
+        var e = entry
+        if let v = (d.object(forKey: "temperature") as? NSNumber)?.doubleValue { e.temperature = v }
+        if let v = (d.object(forKey: "feelsLike") as? NSNumber)?.doubleValue { e.feelsLike = v }
+        if let v = (d.object(forKey: "high") as? NSNumber)?.doubleValue { e.high = v }
+        if let v = (d.object(forKey: "low") as? NSNumber)?.doubleValue { e.low = v }
+        if let v = (d.object(forKey: "weatherCode") as? NSNumber)?.intValue, v >= 0 { e.weatherCode = v }
+        if let v = (d.object(forKey: "rainChance") as? NSNumber)?.intValue { e.rainChance = v }
+        if let v = (d.object(forKey: "windSpeed") as? NSNumber)?.doubleValue { e.windSpeed = v }
+        if let v = (d.object(forKey: "humidity") as? NSNumber)?.doubleValue { e.humidity = v }
+        if let v = d.object(forKey: "city") as? String, !v.isEmpty { e.city = v }
+        if let v = d.object(forKey: "unit") as? String { e.unit = v }
+        if d.object(forKey: "isDay") != nil { e.isDay = d.bool(forKey: "isDay") }
+        return e
     }
 
     private func cachedOrSetup() -> RainCheckEntry {
