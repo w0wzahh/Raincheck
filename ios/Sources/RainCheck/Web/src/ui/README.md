@@ -1,0 +1,1 @@
+UI modules are kept here as V4 grows; app.js currently owns page orchestration while feature/API/core concerns are isolated.

@@ -1,0 +1,4 @@
+version: 1
+bundleID: com.w0wzahh.RainCheck
+iconPath: AppIcon.png
+infoPath: Support/Info.plist
