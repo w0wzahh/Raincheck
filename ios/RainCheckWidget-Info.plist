@@ -7,6 +7,10 @@
         <key>NSExtensionPointIdentifier</key>
         <string>com.apple.widgetkit-extension</string>
     </dict>
+    <key>NSWidgetWantsLocation</key>
+    <true/>
+    <key>NSLocationUsageDescription</key>
+    <string>RainCheck uses your location to show weather for your area in the widget.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>RainCheck uses your location to show weather for your area in the widget.</string>
 </dict>

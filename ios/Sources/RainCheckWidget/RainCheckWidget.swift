@@ -250,17 +250,13 @@ struct Provider: TimelineProvider {
 final class WidgetLocation: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation?, Never>?
-    private var authContinuation: CheckedContinuation<CLAuthorizationStatus, Never>?
 
     func current() async -> CLLocation? {
+        // Widgets can't present the auth prompt themselves — iOS asks the
+        // user when the widget is added (NSWidgetWantsLocation) and the
+        // containing app requests on its behalf. Just check eligibility.
+        guard manager.isAuthorizedForWidgetUpdates else { return nil }
         manager.delegate = self
-        var status = manager.authorizationStatus
-        if status == .notDetermined {
-            status = await requestAuthorization()
-        }
-        guard status == .authorizedWhenInUse || status == .authorizedAlways else {
-            return nil
-        }
         return await withTaskGroup(of: CLLocation?.self) { group in
             group.addTask { await self.requestLocation() }
             group.addTask {
@@ -273,34 +269,10 @@ final class WidgetLocation: NSObject, CLLocationManagerDelegate {
         }
     }
 
-    private func requestAuthorization() async -> CLAuthorizationStatus {
-        await withCheckedContinuation { cont in
-            authContinuation = cont
-            manager.requestWhenInUseAuthorization()
-            // If the prompt can't be presented (extension contexts can
-            // swallow it), don't hang the timeline — treat as denied.
-            Task { [weak self] in
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
-                guard let self, let pending = self.authContinuation else { return }
-                self.authContinuation = nil
-                pending.resume(returning: .denied)
-            }
-        }
-    }
-
     private func requestLocation() async -> CLLocation? {
         await withCheckedContinuation { cont in
             continuation = cont
             manager.requestLocation()
-        }
-    }
-
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        let status = manager.authorizationStatus
-        Task { @MainActor in
-            guard let cont = authContinuation else { return }
-            authContinuation = nil
-            cont.resume(returning: status)
         }
     }
 
