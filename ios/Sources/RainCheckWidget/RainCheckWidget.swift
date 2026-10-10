@@ -98,17 +98,23 @@ struct Provider: TimelineProvider {
             return cachedOrSetup()
         }
 
-        var lat: Double, lon: Double, city: String
-        if let location = await WidgetLocation().current() {
-            lat = location.coordinate.latitude
-            lon = location.coordinate.longitude
-            city = await Self.reverseGeocode(location) ?? "Current Location"
-        } else if let ip = await Self.ipLocation() {
-            // No permission needed — coarse but always available.
-            lat = ip.lat; lon = ip.lon; city = ip.city
-        } else {
-            return cachedOrSetup()
+        // Race precise location against IP geolocation — whichever
+        // resolves first wins, so a stalled auth prompt can't starve us.
+        let found = await withTaskGroup(
+            of: (city: String, lat: Double, lon: Double)?.self
+        ) { group in
+            group.addTask {
+                guard let loc = await WidgetLocation().current() else { return nil }
+                let city = await Self.reverseGeocode(loc) ?? "Current Location"
+                return (city, loc.coordinate.latitude, loc.coordinate.longitude)
+            }
+            group.addTask { await Self.ipLocation() }
+            var result: (city: String, lat: Double, lon: Double)? = nil
+            for await r in group where r != nil { result = r; break }
+            group.cancelAll()
+            return result
         }
+        guard let (city, lat, lon) = found else { return cachedOrSetup() }
         UserDefaults(suiteName: cacheSuite)?.set(
             ["lat": lat, "lon": lon, "city": city], forKey: "lastLocation"
         )
@@ -271,6 +277,14 @@ final class WidgetLocation: NSObject, CLLocationManagerDelegate {
         await withCheckedContinuation { cont in
             authContinuation = cont
             manager.requestWhenInUseAuthorization()
+            // If the prompt can't be presented (extension contexts can
+            // swallow it), don't hang the timeline — treat as denied.
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard let self, let pending = self.authContinuation else { return }
+                self.authContinuation = nil
+                pending.resume(returning: .denied)
+            }
         }
     }
 
